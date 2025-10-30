@@ -23,10 +23,7 @@
   .hint { color:#555; font-size:0.95rem; margin-top:8px; }
   .segmented { display:inline-flex; border:1px solid #ccc; border-radius:8px; overflow:hidden; }
   .segmented input { display:none; }
-  .segmented label {
-    padding:6px 12px; cursor:pointer; user-select:none; font-weight:600; font-size:0.9rem;
-    background:#f8f8f8; border-right:1px solid #ddd;
-  }
+  .segmented label { padding:6px 12px; cursor:pointer; user-select:none; font-weight:600; font-size:0.9rem; background:#f8f8f8; border-right:1px solid #ddd; }
   .segmented label:last-child { border-right:none; }
   .segmented input:checked + label { background:#e9eefc; color:#0b48bf; }
   .toolbar { display:flex; gap:12px; align-items:center; margin-top:10px; flex-wrap:wrap; }
@@ -269,19 +266,15 @@
     q("g2label_n").textContent = g2;
   }
 
-  // annotations (horizontal)
+  // annotations (now with no background/box)
   function pointAnnotation(x, yNum, text){
     return {
       x, y: yNum, text,
       xref: "x", yref: "y",
       showarrow: false,
       font: { size: 12, color: "#000", family: "inherit" },
-      align: "left",
-      xshift: 14,
-      yanchor: "middle",
-      bgcolor: "rgba(255,255,255,0.6)",
-      bordercolor: "rgba(0,0,0,0.15)",
-      borderwidth: 1, borderpad: 2
+      align: "center",
+      yanchor: "middle"
     };
   }
   function boundAnnotation(x, yNum, text, side){
@@ -290,9 +283,8 @@
       x, y: yNum, text,
       xref: "x", yref: "y",
       showarrow: false,
-      font: { size: 12, color: "#222", family: "inherit" },
-      xshift, yanchor: "middle", bgcolor: "rgba(255,255,255,0.6)",
-      bordercolor: "rgba(0,0,0,0.15)", borderwidth: 1, borderpad: 2
+      font: { size: 12, color: CI_COLOR, family: "inherit" },
+      xshift, yanchor: "middle"
     };
   }
 
@@ -303,7 +295,7 @@
     return 1 - level;
   }
 
-  // Build APA + Managerial
+  // Build write-ups
   function buildWriteups({g1,g2}, p1, n1, p2, n2, alpha, z, p, cd, levelPct){
     const p1s = pct(p1,1), p2s = pct(p2,1);
     const dsPP  = ppLabel(cd.d,1);
@@ -405,15 +397,13 @@
     const cd_50 = ciDiff(p1, n1, p2, n2, z50), cd_80 = ciDiff(p1, n1, p2, n2, z80), cd = ciDiff(p1, n1, p2, n2, zSel);
 
     // ----- Chart 1 (Proportions with fan bands) -----
-    // numeric Y positions: 0 => g1, 1 => g2
     const y1 = 0, y2 = 1;
-    const propHalf = 0.22; // row half-height for band thickness
+    const propHalf = 0.22; // band thickness
+    const labelOffset = 0.10; // extra spacing below band for labels
 
-    // x-axis range
     const propMaxAuto = Math.min(1, Math.max(c1.hi, c2.hi) * 1.15);
     const propRange = getLockedPropRange() || [0, propMaxAuto];
 
-    // bands: 50% (darkest), 80% (medium), selected (lightest)
     const propShapes = [
       // Group 1
       makeBandRect(Math.max(0,c1_50.lo), Math.min(1,c1_50.hi), y1, propHalf*0.7, "#6f8cff", 0.45),
@@ -435,9 +425,12 @@
       name: "Estimate"
     };
 
+    // labels: point labels go BELOW the bands; bound labels remain near ends
+    const propPointY1 = y1 - (propHalf + labelOffset);
+    const propPointY2 = y2 - (propHalf + labelOffset);
     const propAnn = [
-      pointAnnotation(p1, y1, pct(p1,1)),
-      pointAnnotation(p2, y2, pct(p2,1)),
+      pointAnnotation(p1, propPointY1, pct(p1,1)),
+      pointAnnotation(p2, propPointY2, pct(p2,1)),
       boundAnnotation(c1.lo, y1, pct(c1.lo,1), "lo"),
       boundAnnotation(c1.hi, y1, pct(c1.hi,1), "hi"),
       boundAnnotation(c2.lo, y2, pct(c2.lo,1), "lo"),
@@ -446,13 +439,15 @@
 
     const propLayout = {
       title: `Estimated Proportions for ${g1} and ${g2} with Fan Bands (50%, 80%, ${levelPct}%)`,
-      xaxis: { title: "Proportion", range: propRange, tickformat: ",.0%" },
+      xaxis: { title: "Proportion", range: propRange, tickformat: ",.0%", showgrid: true, gridcolor: "#f1f3f5", gridwidth: 1, zeroline: false },
       yaxis: {
         title: "",
         tickvals: [y1, y2],
         ticktext: [g1, g2],
-        range: [-0.8, 1.8],
-        fixedrange: true
+        range: [-1.2, 1.8],   /* extend lower space so labels fit */
+        fixedrange: true,
+        showgrid: false,      /* remove horizontal grid lines */
+        zeroline: false
       },
       margin: { t: 60, l: 180, r: 20, b: 60 },
       showlegend: false,
@@ -463,8 +458,9 @@
     q("propTitle").textContent = `Proportions for ${g1} and ${g2} — Fan Chart (50/80/${levelPct}%)`;
 
     // ----- Chart 2 (Difference fan band) -----
-    const yDelta = 0; // single row for Δ
+    const yDelta = 0;
     const diffHalf = 0.22;
+    const diffLabelOffset = 0.10;
 
     const m = Math.max(Math.abs(cd.hi), Math.abs(cd.lo));
     const pad = Math.max(0.01, m * 0.25);
@@ -486,21 +482,24 @@
       hoverinfo: "x+y", name: "Difference"
     };
 
+    const diffPointY = yDelta - (diffHalf + diffLabelOffset);
     const diffAnn = [
-      pointAnnotation(cd.d, yDelta, ppLabel(cd.d,1)),
+      pointAnnotation(cd.d, diffPointY, ppLabel(cd.d,1)),
       boundAnnotation(cd.lo, yDelta, ppLabel(cd.lo,1), "lo"),
       boundAnnotation(cd.hi, yDelta, ppLabel(cd.hi,1), "hi")
     ];
 
     const diffLayout = {
       title: `Difference in Proportions (${g2} − ${g1}) with Fan Bands (50%, 80%, ${levelPct}%)`,
-      xaxis: { title: "Difference (pct.pts)", range: diffRange, tickformat: "+,.1%" },
+      xaxis: { title: "Difference (pct.pts)", range: diffRange, tickformat: "+,.1%", showgrid: true, gridcolor: "#f1f3f5", gridwidth: 1, zeroline: false },
       yaxis: {
         title: "",
         tickvals: [yDelta],
         ticktext: [`Δ = ${g2} − ${g1}`],
-        range: [-0.8, 0.8],
-        fixedrange: true
+        range: [-1.0, 0.8],   /* extra room for label below */
+        fixedrange: true,
+        showgrid: false,
+        zeroline: false
       },
       margin: { t: 60, l: 220, r: 20, b: 60 },
       showlegend: false,
