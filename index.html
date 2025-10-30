@@ -11,13 +11,24 @@
   <!-- Plotly Library for visualization -->
   <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 
-  <!-- MathJax for LaTeX rendering (Statistical Equations) -->
+  <!-- MathJax for LaTeX rendering -->
   <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
   <script id="MathJax-script" async
     src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+  <style>
+    #timestamp {
+      text-align: right;
+      font-size: 0.85rem;
+      color: #555;
+      margin-right: 1rem;
+    }
+  </style>
 </head>
 
 <body>
+  <div id="timestamp"></div>
+
   <!-- Title -->
   <h1>StudyFlow Influencer A/B Test Planner</h1>
 
@@ -30,18 +41,11 @@
       This tool helps you determine the <strong>Required Sample Size</strong> ($N$ per group) needed for a valid A/B test by adjusting the statistical parameters below.
     </p>
     <p class="equation">
-      <strong>Core Test:</strong> You are testing if the conversion rate of the Variant ($P_2$) is greater than the Control ($P_1$) using a Z-test for two independent proportions.
-    </p>
-    <p class="equation">
       <strong>Required Sample Size (N) Formula:</strong>
       $$N = \frac{\left[z_{1-\alpha} \sqrt{2P_{pool}(1-P_{pool})} + z_{1-\beta} \sqrt{P_1(1-P_1) + P_2(1-P_2)}\right]^2}{\delta^2}$$
     </p>
-    <p class="equation">
-      *Where: $\delta = |P_2 - P_1|$ (Hypothesized Difference)*
-    </p>
   </div>
 
-  <!-- Output & Metrics Display -->
   <div id="metrics" class="metrics-panel">
     <h2>A/B Test Outcomes</h2>
     <p id="sample_size" class="metric-output"></p>
@@ -50,40 +54,37 @@
 
   <hr class="separator" />
 
-  <!-- Control Section -->
+  <!-- Controls -->
   <h3>Test Parameters (What You Decide)</h3>
   <div class="controls-container">
     <div class="control-column">
       <h4>Conversion Rate Assumptions</h4>
 
-      <!-- P1 (Control) -->
+      <!-- P1 -->
       <div class="control-group">
         <label>
           P₁ (Alpha's Current Conversion Rate):
-          <input type="range" id="P1" min="0.05" max="0.30" step="0.01" value="0.10" />
-          <input type="number" id="P1_num" min="0.05" max="0.30" step="0.001" value="0.10" />
-          <span id="P1_value" class="display-value">0.10</span>
-          <p class="plain-language">Alpha's current success rate (Control Group).</p>
+          <input type="range" id="p1Slider" min="0.05" max="0.30" step="0.01" value="0.10" />
+          <input type="number" id="p1Number" min="0.05" max="0.30" step="0.001" value="0.10" />
+          <span id="p1Display" class="display-value">10%</span>
         </label>
       </div>
 
-      <!-- P2 (Variant) -->
+      <!-- P2 -->
       <div class="control-group">
         <label>
           P₂ (Beta's Expected Conversion Rate):
-          <input type="range" id="P2" min="0.05" max="0.30" step="0.01" value="0.13" />
-          <input type="number" id="P2_num" min="0.05" max="0.30" step="0.001" value="0.13" />
-          <span id="P2_value" class="display-value">0.13</span>
-          <p class="plain-language">Beta’s hypothesized success rate (Variant Group).</p>
+          <input type="range" id="p2Slider" min="0.05" max="0.30" step="0.01" value="0.13" />
+          <input type="number" id="p2Number" min="0.05" max="0.30" step="0.001" value="0.13" />
+          <span id="p2Display" class="display-value">13%</span>
         </label>
       </div>
 
-      <!-- Automatically computed delta -->
+      <!-- Δ -->
       <div class="control-group">
         <label>
           Δ (Observed Lift: |P₂ – P₁|):
-          <span id="delta_value" class="display-value">0.03</span>
-          <p class="plain-language">The difference between Beta and Alpha’s conversion rates.</p>
+          <span id="deltaDisplay" class="display-value">3%</span>
         </label>
       </div>
     </div>
@@ -91,25 +92,23 @@
     <div class="control-column">
       <h4>Confidence & Risk Settings</h4>
 
-      <!-- Type I Error (Alpha) -->
+      <!-- Alpha -->
       <div class="control-group">
         <label>
-          $\alpha$ (Risk of False Positive):
-          <input type="range" id="alpha" min="0.01" max="0.20" step="0.01" value="0.05" />
-          <input type="number" id="alpha_num" min="0.01" max="0.20" step="0.001" value="0.05" />
-          <span id="alpha_value" class="display-value">0.05</span>
-          <p class="plain-language">Risk of incorrectly concluding Beta performs better when it doesn't (Type I Error).</p>
+          α (Significance Level):
+          <input type="range" id="alphaSlider" min="0.01" max="0.20" step="0.01" value="0.05" />
+          <input type="number" id="alphaNumber" min="0.01" max="0.20" step="0.001" value="0.05" />
+          <span id="alphaDisplay" class="display-value">0.05</span>
         </label>
       </div>
 
       <!-- Power -->
       <div class="control-group">
         <label>
-          Power (Chance of True Positive):
-          <input type="range" id="power" min="0.70" max="0.99" step="0.01" value="0.80" />
-          <input type="number" id="power_num" min="0.70" max="0.99" step="0.001" value="0.80" />
-          <span id="power_value" class="display-value">0.80</span>
-          <p class="plain-language">Chance of correctly detecting Beta’s lift when it truly exists (1−β).</p>
+          Power (1–β):
+          <input type="range" id="powerSlider" min="0.70" max="0.99" step="0.01" value="0.80" />
+          <input type="number" id="powerNumber" min="0.70" max="0.99" step="0.001" value="0.80" />
+          <span id="powerDisplay" class="display-value">0.80</span>
         </label>
       </div>
     </div>
@@ -117,21 +116,26 @@
 
   <hr class="separator" />
 
-  <!-- Plotly Visualization -->
-  <div id="distributionPlot"></div>
+  <div id="plot"></div>
 
-  <!-- Exploratory Questions -->
   <div id="questions">
     <h3>Exploratory Questions for StudyFlow Analysts</h3>
     <ol>
-      <li>What happens to the <strong>Required Sample Size</strong> ($N$) when you decrease your $\alpha$ (False Positive risk)? Why does this change occur?</li>
-      <li>Why does a larger <strong>Lift ($\delta$)</strong> drastically <em>decrease</em> the required sample size? Relate this to the visual overlap of the two distributions.</li>
-      <li>If Influencer Beta charges a premium, should you lean toward higher Power (e.g., 0.95) or lower $\alpha$ (e.g., 0.01)? Which error has the higher business cost?</li>
-      <li>Observe the visual separation of the two distributions. What elements in the formula mathematically control this separation?</li>
+      <li>What happens to $N$ when you decrease α?</li>
+      <li>Why does a larger Δ drastically decrease the required sample size?</li>
+      <li>Should you prefer higher Power or lower α when Beta is expensive?</li>
     </ol>
   </div>
 
-  <!-- External JavaScript -->
   <script src="app.js" defer></script>
+
+  <script>
+    // Timestamp display
+    document.addEventListener("DOMContentLoaded", () => {
+      const ts = new Date();
+      const formatted = ts.toLocaleString();
+      document.getElementById("timestamp").textContent = "Last updated: " + formatted;
+    });
+  </script>
 </body>
 </html>
