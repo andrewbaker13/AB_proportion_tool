@@ -1,25 +1,26 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>A/B Proportion 95 % CI Visualizer</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>A/B Proportion CI – Dot & Whisker</title>
 <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 <style>
-  body { font-family:system-ui,Segoe UI,Roboto,sans-serif; margin:2rem; }
-  header { display:flex; justify-content:space-between; align-items:baseline; flex-wrap:wrap; }
-  h1 { margin:0; font-size:1.25rem; }
+  body { font-family: system-ui, Segoe UI, Roboto, Arial, sans-serif; margin: 24px; }
+  header { display:flex; justify-content:space-between; align-items:baseline; gap:16px; flex-wrap:wrap; }
+  h1 { margin:0; font-size:1.2rem; }
   #timestamp { color:#555; font-size:0.9rem; }
-  .controls { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:1rem; margin-top:1rem; }
-  .card { border:1px solid #ddd; border-radius:10px; padding:1rem; }
-  label { display:block; font-weight:600; margin-top:0.5rem; }
-  input[type="range"], input[type="number"] { width:100%; margin-top:0.25rem; }
-  #propChart,#diffChart { height:350px; margin-top:2rem; }
+  .controls { display:grid; grid-template-columns: repeat(auto-fit, minmax(260px,1fr)); gap:16px; margin-top:16px; }
+  .card { border:1px solid #e3e3e3; border-radius:10px; padding:14px; }
+  label { display:block; font-weight:600; margin-top:8px; }
+  input[type="range"], input[type="number"] { width:100%; margin-top:6px; }
+  .hint { color:#666; font-size:0.9rem; margin-top:8px; }
+  #propChart, #diffChart { height:380px; margin-top:18px; }
 </style>
 </head>
 <body>
 <header>
-  <h1>A/B Proportion Visualizer</h1>
+  <h1>A/B Proportions – 95% CI (Dot & Whisker)</h1>
   <div id="timestamp"></div>
 </header>
 
@@ -40,102 +41,201 @@
     <input id="n1" type="number" min="1" step="1" value="1000">
     <label>n₂ (Variant sample size)</label>
     <input id="n2" type="number" min="1" step="1" value="1000">
-    <p style="margin-top:1rem;font-size:0.9rem;color:#555">
-      Adjust P₁, P₂, α, n₁, n₂ to see how the CIs and difference change.
-    </p>
+    <p class="hint">Point = large red dot with percentage. Whiskers = 95% CI with labeled bounds.</p>
   </div>
 </div>
 
-<h3>Proportions with 95 % CIs</h3>
+<h3>Proportions (P₁, P₂) with 95% CI</h3>
 <div id="propChart"></div>
 
-<h3>Difference (P₂ – P₁) with 95 % CI</h3>
+<h3>Difference (Δ = P₂ − P₁) with 95% CI</h3>
 <div id="diffChart"></div>
 
 <script>
-(function(){ // timestamp
-  const d=new Date();
-  document.getElementById("timestamp").textContent=
-    "Last updated: "+d.toLocaleString();
-})();
+  // ---------- timestamp ----------
+  (function() {
+    const ts = new Date();
+    const pad = (n)=> String(n).padStart(2,'0');
+    const s = `${ts.getFullYear()}-${pad(ts.getMonth()+1)}-${pad(ts.getDate())} `
+            + `${pad(ts.getHours())}:${pad(ts.getMinutes())}:${pad(ts.getSeconds())}`;
+    document.getElementById('timestamp').textContent = `Last updated: ${s}`;
+  })();
 
-// ---- math helpers ----
-function invNorm(p){
-  const a1=-39.6968302866538,a2=220.946098424521,a3=-275.928510446969,a4=138.357751867269,a5=-30.6647980661472,a6=2.50662827745924;
-  const b1=-54.4760987982241,b2=161.585836858041,b3=-155.698979859887,b4=66.8013118877197,b5=-13.2806815528857;
-  const c1=-0.00778489400243029,c2=-0.322396458041136,c3=-2.40075827716184,c4=-2.54973253934373,c5=4.37466414146497,c6=2.93816398269878;
-  const d1=0.00778469570904146,d2=0.32246712907004,d3=2.445134137143,d4=3.75440866190742;
-  if(p<=0||p>=1) return NaN; let q,r;
-  if(p<0.02425){q=Math.sqrt(-2*Math.log(p));return-(((((c1*q+c2)*q+c3)*q+c4)*q+c5)*q+c6)/((((d1*q+d2)*q+d3)*q+d4)*q+1);}
-  if(p>1-0.02425){q=Math.sqrt(-2*Math.log(1-p));return(((((c1*q+c2)*q+c3)*q+c4)*q+c5)*q+c6)/((((d1*q+d2)*q+d3)*q+d4)*q+1);}
-  q=p-0.5;r=q*q;
-  return(((((a1*r+a2)*r+a3)*r+a4)*r+a5)*r+a6)*q/(((((b1*r+b2)*r+b3)*r+b4)*r+b5)*r+1);
-}
+  // ---------- helpers ----------
+  const q = (id)=>document.getElementById(id);
+  const RED = "#c8102e";   // SDSU-ish red
+  const CI_COLOR = "#222"; // dark CI whiskers for contrast
 
-function ciProp(p,n,z){
-  const se=Math.sqrt(Math.max(0,p*(1-p)/n));
-  return{lo:p-z*se,hi:p+z*se,se};
-}
-function ciDiff(p1,n1,p2,n2,z){
-  const se=Math.sqrt(p1*(1-p1)/n1+p2*(1-p2)/n2);
-  const d=p2-p1;
-  return{d,lo:d-z*se,hi:d+z*se,se};
-}
-function pct(x){return(x*100).toFixed(1)+"%";}
+  function pct(x){ return (x*100).toFixed(1) + "%"; }
 
-// ---- main render ----
-function render(){
-  const p1=parseFloat(p1El.value),p2=parseFloat(p2El.value),
-        alpha=parseFloat(alphaEl.value),n1=parseInt(n1El.value),n2=parseInt(n2El.value);
-  if([p1,p2,alpha,n1,n2].some(v=>isNaN(v)))return;
-  const z=invNorm(1-alpha/2);
+  // Inverse normal CDF (Abramowitz–Stegun)
+  function invNorm(p){
+    const a1=-39.6968302866538,a2=220.946098424521,a3=-275.928510446969,a4=138.357751867269,a5=-30.6647980661472,a6=2.50662827745924;
+    const b1=-54.4760987982241,b2=161.585836858041,b3=-155.698979859887,b4=66.8013118877197,b5=-13.2806815528857;
+    const c1=-0.00778489400243029,c2=-0.322396458041136,c3=-2.40075827716184,c4=-2.54973253934373,c5=4.37466414146497,c6=2.93816398269878;
+    const d1=0.00778469570904146,d2=0.32246712907004,d3=2.445134137143,d4=3.75440866190742;
+    if(p<=0||p>=1) return NaN; let qv,rv;
+    if(p<0.02425){ qv=Math.sqrt(-2*Math.log(p)); return -(((((c1*qv+c2)*qv+c3)*qv+c4)*qv+c5)*qv+c6)/((((d1*qv+d2)*qv+d3)*qv+d4)*qv+1); }
+    if(p>1-0.02425){ qv=Math.sqrt(-2*Math.log(1-p)); return (((((c1*qv+c2)*qv+c3)*qv+c4)*qv+c5)*qv+c6)/((((d1*qv+d2)*qv+d3)*qv+d4)*qv+1); }
+    qv=p-0.5; rv=qv*qv;
+    return (((((a1*rv+a2)*rv+a3)*rv+a4)*rv+a5)*rv+a6)*qv/(((((b1*rv+b2)*rv+b3)*rv+b4)*rv+b5)*rv+1);
+  }
 
-  // proportion CIs
-  const c1=ciProp(p1,n1,z),c2=ciProp(p2,n2,z);
-  const propData=[{
-    type:"bar",
-    x:["P₁ (control)","P₂ (variant)"],
-    y:[p1,p2],
-    error_y:{type:"data",array:[c1.hi-p1,c2.hi-p2],arrayminus:[p1-c1.lo,p2-c2.lo],visible:true}
-  }];
-  const propLayout={
-    yaxis:{title:"Proportion",range:[0,Math.min(1,Math.max(c1.hi,c2.hi)*1.2)]},
-    margin:{t:40,l:60,r:20,b:60},
-    showlegend:false
-  };
-  Plotly.react("propChart",propData,propLayout,{displayModeBar:false});
+  function ciProp(p,n,z){
+    const se = Math.sqrt(Math.max(0, p*(1-p)/n));
+    return { lo: p - z*se, hi: p + z*se, se };
+  }
 
-  // difference CIs
-  const cd=ciDiff(p1,n1,p2,n2,z);
-  const diffData=[{
-    type:"bar",
-    x:["Δ = P₂ − P₁"],
-    y:[cd.d],
-    error_y:{type:"data",array:[cd.hi-cd.d],arrayminus:[cd.d-cd.lo],visible:true}
-  }];
-  const m=Math.max(Math.abs(cd.hi),Math.abs(cd.lo));
-  const diffLayout={
-    yaxis:{title:"Difference",range:[-(m*1.3),(m*1.3)]},
-    shapes:[{type:"line",x0:-0.5,x1:1.5,y0:0,y1:0,line:{width:1,dash:"dot"}}],
-    margin:{t:40,l:60,r:20,b:60},
-    showlegend:false
-  };
-  Plotly.react("diffChart",diffData,diffLayout,{displayModeBar:false});
-}
+  function ciDiff(p1,n1,p2,n2,z){
+    const se = Math.sqrt(Math.max(0, p1*(1-p1)/n1 + p2*(1-p2)/n2));
+    const d  = p2 - p1;
+    return { d, lo: d - z*se, hi: d + z*se, se };
+  }
 
-// ---- element refs & listeners ----
-const p1El=document.getElementById("p1"),p1Num=document.getElementById("p1num");
-const p2El=document.getElementById("p2"),p2Num=document.getElementById("p2num");
-const alphaEl=document.getElementById("alpha"),alphaNum=document.getElementById("alphanum");
-const n1El=document.getElementById("n1"),n2El=document.getElementById("n2");
+  // Build annotations for point label (on the dot) and CI bounds (at whisker ends)
+  function pointAnnotation(x, y, text){
+    return {
+      x, y, text,
+      xref: "x", yref: "y",
+      showarrow: false,
+      font: { size: 12, color: "#fff", family: "inherit" },
+      align: "center",
+      yanchor: "middle"
+    };
+  }
+  function boundAnnotation(x, y, text, side){
+    // side: "lo" or "hi" for positioning offset
+    const xshift = side === "lo" ? -24 : 24;
+    return {
+      x, y, text,
+      xref: "x", yref: "y",
+      showarrow: false,
+      font: { size: 12, color: CI_COLOR, family: "inherit" },
+      xshift, yanchor: "middle", bgcolor: "rgba(255,255,255,0.6)",
+      bordercolor: "rgba(0,0,0,0.15)", borderwidth: 1, borderpad: 2
+    };
+  }
 
-[[p1El,p1Num],[p2El,p2Num],[alphaEl,alphaNum]].forEach(([r,n])=>{
-  r.addEventListener("input",()=>{n.value=r.value;render();});
-  n.addEventListener("input",()=>{r.value=n.value;render();});
-});
-[n1El,n2El].forEach(el=>el.addEventListener("input",render));
+  // Render the two charts
+  function render(){
+    const p1 = parseFloat(q('p1').value),   p2 = parseFloat(q('p2').value);
+    const a  = parseFloat(q('alpha').value);
+    const n1 = parseInt(q('n1').value,10), n2 = parseInt(q('n2').value,10);
+    if ([p1,p2,a,n1,n2].some(v=>isNaN(v))) return;
 
-render(); // initial
+    const z = invNorm(1 - a/2);
+
+    // ----- Chart 1: P1 & P2 as dots with prominent 95% CI -----
+    const c1 = ciProp(p1, n1, z);
+    const c2 = ciProp(p2, n2, z);
+
+    // One scatter trace with error bars → prominent "whiskers"
+    const propTrace = {
+      type: "scatter",
+      mode: "markers",
+      x: ["P₁ (control)", "P₂ (variant)"],
+      y: [p1, p2],
+      marker: {
+        color: RED, size: 22,
+        line: { color: RED, width: 2 },
+        symbol: "circle"
+      },
+      error_y: {
+        type: "data",
+        array: [c1.hi - p1, c2.hi - p2],      // + error
+        arrayminus: [p1 - c1.lo, p2 - c2.lo], // - error
+        visible: true,
+        color: CI_COLOR,
+        thickness: 4,   // whisker thickness
+        width: 10       // cap width
+      },
+      hoverinfo: "x+y",
+      name: "Estimate"
+    };
+
+    // Annotations: point labels and CI bound labels
+    const propAnn = [
+      pointAnnotation("P₁ (control)", p1, pct(p1)),
+      pointAnnotation("P₂ (variant)", p2, pct(p2)),
+      boundAnnotation("P₁ (control)", c1.lo, pct(c1.lo), "lo"),
+      boundAnnotation("P₁ (control)", c1.hi, pct(c1.hi), "hi"),
+      boundAnnotation("P₂ (variant)", c2.lo, pct(c2.lo), "lo"),
+      boundAnnotation("P₂ (variant)", c2.hi, pct(c2.hi), "hi")
+    ];
+
+    const propMax = Math.min(1, Math.max(c1.hi, c2.hi) * 1.15);
+    const propLayout = {
+      title: `Proportions with 95% CI (n₁=${n1.toLocaleString()}, n₂=${n2.toLocaleString()}, α=${a.toFixed(3)})`,
+      yaxis: { title: "Proportion", range: [0, propMax], tickformat: ",.0%" },
+      xaxis: { tickangle: -2 },
+      margin: { t: 60, l: 70, r: 20, b: 60 },
+      showlegend: false,
+      annotations: propAnn
+    };
+
+    Plotly.react("propChart", [propTrace], propLayout, {displayModeBar:false});
+
+    // ----- Chart 2: Difference Δ as a dot with prominent 95% CI -----
+    const cd = ciDiff(p1, n1, p2, n2, z);
+
+    const diffTrace = {
+      type: "scatter",
+      mode: "markers",
+      x: ["Δ = P₂ − P₁"],
+      y: [cd.d],
+      marker: {
+        color: RED, size: 22,
+        line: { color: RED, width: 2 },
+        symbol: "circle"
+      },
+      error_y: {
+        type: "data",
+        array: [cd.hi - cd.d],
+        arrayminus: [cd.d - cd.lo],
+        visible: true,
+        color: CI_COLOR,
+        thickness: 4,
+        width: 10
+      },
+      hoverinfo: "x+y",
+      name: "Difference"
+    };
+
+    const m = Math.max(Math.abs(cd.hi), Math.abs(cd.lo));
+    const pad = Math.max(0.01, m * 0.25);
+    const diffAnn = [
+      pointAnnotation("Δ = P₂ − P₁", cd.d, pct(cd.d)),
+      boundAnnotation("Δ = P₂ − P₁", cd.lo, pct(cd.lo), "lo"),
+      boundAnnotation("Δ = P₂ − P₁", cd.hi, pct(cd.hi), "hi")
+    ];
+    const diffLayout = {
+      title: "Difference with 95% CI",
+      yaxis: { title: "Δ (proportion)", range: [-(m+pad), (m+pad)], tickformat: "+,.1%" },
+      xaxis: {},
+      shapes: [{
+        type: "line", x0: -0.5, x1: 1.5, y0: 0, y1: 0, line: { width: 1, dash: "dot", color: "#777" }
+      }],
+      margin: { t: 60, l: 70, r: 20, b: 60 },
+      showlegend: false,
+      annotations: diffAnn
+    };
+
+    Plotly.react("diffChart", [diffTrace], diffLayout, {displayModeBar:false});
+  }
+
+  // ---------- element refs & listeners ----------
+  const p1El=q("p1"), p1Num=q("p1num");
+  const p2El=q("p2"), p2Num=q("p2num");
+  const alphaEl=q("alpha"), alphaNum=q("alphanum");
+  const n1El=q("n1"), n2El=q("n2");
+
+  [[p1El,p1Num],[p2El,p2Num],[alphaEl,alphaNum]].forEach(([r,n])=>{
+    r.addEventListener("input", ()=>{ n.value=r.value; render(); });
+    n.addEventListener("input", ()=>{ r.value=n.value; render(); });
+  });
+  [n1El,n2El].forEach(el=> el.addEventListener("input", render));
+
+  render(); // initial
 </script>
 </body>
 </html>
