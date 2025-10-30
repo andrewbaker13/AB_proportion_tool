@@ -19,6 +19,7 @@
   input[type="range"], input[type="number"], input[type="text"] { width:100%; margin-top:6px; }
   .row { display:grid; grid-template-columns: 1fr 120px; column-gap:10px; align-items:center; }
   .row.single { grid-template-columns: 1fr; }
+  .row.axis { grid-template-columns: 160px 1fr 90px 90px; column-gap:10px; align-items:center; }
   .divider { border-top:1px dashed #d6dae6; margin:14px 0; }
   .hint { color:#555; font-size:0.95rem; margin-top:8px; }
   .segmented { display:inline-flex; border:1px solid #ccc; border-radius:8px; overflow:hidden; }
@@ -42,6 +43,9 @@
   .summary th, .summary td { border:1px solid #e3e3e3; padding:8px 10px; text-align:left; }
   .summary thead th { background:#f7f9ff; font-weight:700; }
   .mono { font-variant-numeric: tabular-nums; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  .muted { color:#6b7280; font-size:0.9rem; }
+  .btn { padding:6px 10px; border:1px solid #cbd5e1; border-radius:8px; background:#f8fafc; cursor:pointer; font-weight:600; }
+  .btn:hover { background:#eef2f7; }
 </style>
 </head>
 <body>
@@ -113,7 +117,7 @@
     <p class="hint">Slide \(n_1\)/\(n_2\) between 10–2000, or type any value directly into the number box.</p>
   </div>
 
-  <!-- BOX B: Test & Reporting -->
+  <!-- BOX B: Confidence & Reporting -->
   <div class="card" id="boxB">
     <h3>Confidence Level & Reporting</h3>
 
@@ -131,9 +135,36 @@
 
     <div id="writeups">
       <h4>APA-Style Statistical Reporting</h4>
-      <p id="apaWriteup" class="mono"></p>
+      <p id="apaWriteup"></p>
       <h4>Managerial Interpretation</h4>
       <p id="mgrWriteup"></p>
+    </div>
+  </div>
+
+  <!-- BOX C: Chart Axis Settings -->
+  <div class="card" id="boxC">
+    <h3>Chart Axis Settings</h3>
+
+    <!-- Proportions axis lock -->
+    <div class="row axis">
+      <label><input type="checkbox" id="lockPropAxis"> Lock proportions x-axis</label>
+      <span class="muted">Range (%):</span>
+      <input id="propMin" type="number" step="1" value="0" aria-label="Proportion axis min percent">
+      <input id="propMax" type="number" step="1" value="60" aria-label="Proportion axis max percent">
+    </div>
+    <p class="hint muted">When locked, the Proportions chart uses the given percent range (e.g., 0 to 60 shows 0%–60%).</p>
+
+    <!-- Difference axis lock -->
+    <div class="row axis" style="margin-top:12px;">
+      <label><input type="checkbox" id="lockDiffAxis"> Lock difference x-axis</label>
+      <span class="muted">Range (pct.pts):</span>
+      <input id="diffMin" type="number" step="1" value="-20" aria-label="Difference axis min pct pts">
+      <input id="diffMax" type="number" step="1" value="20" aria-label="Difference axis max pct pts">
+    </div>
+    <p class="hint muted">When locked, the Difference chart uses the given bounds in percentage points (e.g., −20 to 20).</p>
+
+    <div style="margin-top:12px;">
+      <button id="resetAxes" class="btn" type="button">Reset axes to auto</button>
     </div>
   </div>
 </div>
@@ -178,7 +209,7 @@
   const CI_COLOR = "#222";
 
   function pct(x, d=1){ return (x*100).toFixed(d) + "%"; }
-  function ppSigned(x, d=1){ return (x>=0?"+":"") + (x*100).toFixed(d) + " pp"; }
+  function ppLabel(x, d=1){ return (x>=0?"+":"") + (x*100).toFixed(d) + " pct.pts"; } // percentage points label
   function fmt(x,n=3){ return Number(x).toFixed(n); }
 
   // erf approximation + normal CDF
@@ -276,21 +307,23 @@
     return 1 - level;
   }
 
-  // Build APA write-up and Managerial write-up
+  // Build APA write-up and Managerial write-up (uses "pct.pts")
   function buildWriteups({g1,g2}, p1, n1, p2, n2, alpha, z, p, cd, levelPct){
     const p1s = pct(p1,1), p2s = pct(p2,1);
-    const dsPP  = ppSigned(cd.d,1);
-    const loPP  = ppSigned(cd.lo,1);
-    const hiPP  = ppSigned(cd.hi,1);
+    const dsPP  = ppLabel(cd.d,1);
+    const loPP  = ppLabel(cd.lo,1);
+    const hiPP  = ppLabel(cd.hi,1);
+
+    const significant = Number.isFinite(p) && p < alpha;
+    const decisionClause = significant ? "Therefore, we reject H₀." : "Therefore, we fail to reject H₀.";
 
     const apa =
       `A two-proportion z test (two-tailed) compared ${g2} (p = ${p2s}, n = ${n2}) with ` +
       `${g1} (p = ${p1s}, n = ${n1}) at the ${levelPct}% confidence level (α = ${alpha.toFixed(2)}). ` +
       `The difference in proportions was Δ = ${dsPP}, ${levelPct}% CI [${loPP}, ${hiPP}], ` +
       `z = ${fmt(z,3)}, p = ${Number.isFinite(p) ? (p < 0.001 ? "< .001" : fmt(p,3)) : "—"}. ` +
-      `Null hypothesis: H₀: p_${g2} = p_${g1}.`;
+      `Null hypothesis: H₀: p_${g2} = p_${g1}. ${decisionClause}`;
 
-    const significant = Number.isFinite(p) && p < alpha;
     const decision = significant ? "statistically reliable" : "not statistically reliable";
     const mgr =
       `The proportion for ${g2} is ${p2s} and for ${g1} is ${p1s}. The simple difference is ${dsPP} ` +
@@ -304,7 +337,7 @@
     const rows = [
       { measure: "Proportion", label: g1, val: pct(p1,1), lo: pct(c1.lo,1), hi: pct(c1.hi,1), n: n1.toLocaleString() },
       { measure: "Proportion", label: g2, val: pct(p2,1), lo: pct(c2.lo,1), hi: pct(c2.hi,1), n: n2.toLocaleString() },
-      { measure: "Difference (pp)", label: `${g2} − ${g1}`, val: ppSigned(cd.d,1), lo: ppSigned(cd.lo,1), hi: ppSigned(cd.hi,1), n: `${n2.toLocaleString()} vs ${n1.toLocaleString()}` }
+      { measure: "Difference (pct.pts)", label: `${g2} − ${g1}`, val: ppLabel(cd.d,1), lo: ppLabel(cd.lo,1), hi: ppLabel(cd.hi,1), n: `${n2.toLocaleString()} vs ${n1.toLocaleString()}` }
     ];
     // Update CI column headers with level
     q("ciLowerHeader").textContent = `CI Lower (${levelPct}%)`;
@@ -319,6 +352,26 @@
         <td class="mono">${r.n}</td>
       </tr>
     `).join("");
+  }
+
+  // Axis helpers (locking)
+  function getLockedPropRange(){
+    const locked = q("lockPropAxis").checked;
+    if(!locked) return null;
+    let minPct = parseFloat(q("propMin").value);
+    let maxPct = parseFloat(q("propMax").value);
+    if(!isFinite(minPct) || !isFinite(maxPct)) return null;
+    if(maxPct < minPct){ const t = minPct; minPct = maxPct; maxPct = t; }
+    return [minPct/100, maxPct/100]; // convert % to [0,1]
+  }
+  function getLockedDiffRange(){
+    const locked = q("lockDiffAxis").checked;
+    if(!locked) return null;
+    let minPP = parseFloat(q("diffMin").value);
+    let maxPP = parseFloat(q("diffMax").value);
+    if(!isFinite(minPP) || !isFinite(maxPP)) return null;
+    if(maxPP < minPP){ const t = minPP; minPP = maxPP; maxPP = t; }
+    return [minPP/100, maxPP/100]; // pct.pts to proportion differences
   }
 
   function render(){
@@ -360,10 +413,12 @@
       boundAnnotation(c2.lo, g2, pct(c2.lo,1), "lo"),
       boundAnnotation(c2.hi, g2, pct(c2.hi,1), "hi")
     ];
-    const propMax = Math.min(1, Math.max(c1.hi, c2.hi) * 1.15);
+    const propMaxAuto = Math.min(1, Math.max(c1.hi, c2.hi) * 1.15);
+    const propRange = getLockedPropRange() || [0, propMaxAuto];
+
     const propLayout = {
       title: `Estimated Proportions for ${g1} and ${g2} with ${levelPct}% Confidence Intervals`,
-      xaxis: { title: "Proportion", range: [0, propMax], tickformat: ",.0%" },
+      xaxis: { title: "Proportion", range: propRange, tickformat: ",.0%" },
       yaxis: { title: "", automargin: true },
       margin: { t: 60, l: 160, r: 20, b: 60 },
       showlegend: false, annotations: propAnn
@@ -372,6 +427,8 @@
     q("propTitle").textContent = `Proportions for ${g1} and ${g2} (${levelPct}% CI)`;
 
     // ----- Chart 2 (horizontal difference) -----
+    const m = Math.max(Math.abs(cd.hi), Math.abs(cd.lo));
+    const pad = Math.max(0.01, m * 0.25);
     const diffTrace = {
       type: "scatter",
       mode: "markers",
@@ -386,16 +443,16 @@
       },
       hoverinfo: "x+y", name: "Difference"
     };
-    const m = Math.max(Math.abs(cd.hi), Math.abs(cd.lo));
-    const pad = Math.max(0.01, m * 0.25);
+    const diffRange = getLockedDiffRange() || [-(m+pad), (m+pad)];
+
     const diffAnn = [
-      pointAnnotation(cd.d, `Δ = ${g2} − ${g1}`, ppSigned(cd.d,1)),
-      boundAnnotation(cd.lo, `Δ = ${g2} − ${g1}`, ppSigned(cd.lo,1), "lo"),
-      boundAnnotation(cd.hi, `Δ = ${g2} − ${g1}`, ppSigned(cd.hi,1), "hi")
+      pointAnnotation(cd.d, `Δ = ${g2} − ${g1}`, ppLabel(cd.d,1)),
+      boundAnnotation(cd.lo, `Δ = ${g2} − ${g1}`, ppLabel(cd.lo,1), "lo"),
+      boundAnnotation(cd.hi, `Δ = ${g2} − ${g1}`, ppLabel(cd.hi,1), "hi")
     ];
     const diffLayout = {
       title: `Difference in Proportions (${g2} − ${g1}) with ${levelPct}% Confidence Interval`,
-      xaxis: { title: "Difference (percentage points)", range: [-(m+pad), (m+pad)], tickformat: "+,.1%" },
+      xaxis: { title: "Difference (pct.pts)", range: diffRange, tickformat: "+,.1%" },
       yaxis: { title: "", automargin: true },
       shapes: [{ type: "line", x0: 0, x1: 0, y0: -0.5, y1: 1.5, line: { width: 1, dash: "dot", color: "#777" } }],
       margin: { t: 60, l: 200, r: 20, b: 60 },
@@ -407,7 +464,7 @@
     // ----- Test + write-ups -----
     const { z, p } = zTestTwoProp(p1, n1, p2, n2);
     const { apa, mgr } = buildWriteups({g1,g2}, p1, n1, p2, n2, alpha, z, p, cd, levelPct);
-    q("apaWriteup").innerHTML = apa;
+    q("apaWriteup").textContent = apa;           // match font with managerial section
     q("mgrWriteup").textContent = mgr;
 
     // ----- Summary table -----
@@ -427,6 +484,17 @@
 
   [q("g1name"), q("g2name")].forEach(el => el.addEventListener("input", render));
   document.getElementById("ciLevelGroup").addEventListener("change", render);
+
+  // Axis lock controls
+  [q("lockPropAxis"), q("propMin"), q("propMax"),
+   q("lockDiffAxis"), q("diffMin"), q("diffMax")].forEach(el => el.addEventListener("input", render));
+
+  // Reset axes to auto
+  q("resetAxes").addEventListener("click", () => {
+    q("lockPropAxis").checked = false;
+    q("lockDiffAxis").checked = false;
+    render();
+  });
 
   // initial draw
   render();
