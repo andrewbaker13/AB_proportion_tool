@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>A/B Proportion CI – Dot & Whisker (with CI toggle)</title>
+<title>A/B Proportion CI – Dot & Whisker (with CI toggle + test summary)</title>
 <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 <style>
   body { font-family: system-ui, Segoe UI, Roboto, Arial, sans-serif; margin: 24px; }
@@ -15,7 +15,7 @@
   label { display:block; font-weight:600; margin-top:8px; }
   input[type="range"], input[type="number"] { width:100%; margin-top:6px; }
   .row { display:grid; grid-template-columns: 1fr 110px; column-gap:10px; align-items:center; }
-  .hint { color:#666; font-size:0.9rem; margin-top:8px; }
+  .hint { color:#666; font-size:0.95rem; margin-top:8px; }
   #propChart, #diffChart { height:380px; margin-top:18px; }
   .segmented { display:inline-flex; border:1px solid #ccc; border-radius:8px; overflow:hidden; }
   .segmented input { display:none; }
@@ -26,11 +26,13 @@
   .segmented label:last-child { border-right:none; }
   .segmented input:checked + label { background:#e9eefc; color:#0b48bf; }
   .toolbar { display:flex; gap:12px; align-items:center; margin-top:10px; }
+  #testSummary { margin-top:10px; padding:10px 12px; border:1px dashed #cfd4e1; border-radius:8px; background:#fafcff; }
+  #testSummary .stat { font-weight:700; }
 </style>
 </head>
 <body>
 <header>
-  <h1>A/B Proportions – 95% CI (Dot & Whisker)</h1>
+  <h1>A/B Proportions – CI & Two-Proportion z-Test</h1>
   <div id="timestamp"></div>
 </header>
 
@@ -48,7 +50,8 @@
       <input id="p2num" type="number" min="0.01" max="0.5" step="0.001" value="0.13">
     </div>
 
-    <label>α (Significance level)</label>
+    <!-- α slider stays for teaching, but CI level toggle controls the intervals and test decision -->
+    <label>α (Significance level – teaching slider)</label>
     <div class="row">
       <input id="alpha" type="range" min="0.005" max="0.2" step="0.005" value="0.05">
       <input id="alphanum" type="number" min="0.005" max="0.2" step="0.001" value="0.05">
@@ -80,7 +83,10 @@
       </div>
     </div>
 
-    <p class="hint">Point = large red dot with black label at the side. Whiskers = prominent 95% CI (or selected level), both bounds labeled.</p>
+    <!-- Dynamic statistical interpretation lives here -->
+    <div id="testSummary" class="hint"></div>
+
+    <p class="hint">Point = large red dot with black label to the right. Whiskers = prominent CI with labeled bounds. CI/test level is controlled by the toggle above.</p>
   </div>
 </div>
 
@@ -105,10 +111,20 @@
   const RED = "#c8102e";   // SDSU-ish red
   const CI_COLOR = "#222"; // dark CI whiskers
 
-  // percent formatting
   function pct(x){ return (x*100).toFixed(1) + "%"; }
+  function fmt(x,n=3){ return Number(x).toFixed(n); }
 
-  // inverse normal (Abramowitz–Stegun)
+  // erf approximation + normal CDF
+  function erf(x){
+    const sign = Math.sign(x) || 1;
+    const a1=0.254829592,a2=-0.284496736,a3=1.421413741,a4=-1.453152027,a5=1.061405429,p=0.3275911;
+    const t=1/(1+p*Math.abs(x));
+    const y=1-(((((a5*t+a4)*t+a3)*t+a2)*t+a1)*t)*Math.exp(-x*x);
+    return sign*y;
+  }
+  function normCdf(x){ return 0.5*(1+erf(x/Math.SQRT2)); }
+
+  // inverse normal (Abramowitz–Stegun) → for CI z
   function invNorm(p){
     const a1=-39.6968302866538,a2=220.946098424521,a3=-275.928510446969,a4=138.357751867269,a5=-30.6647980661472,a6=2.50662827745924;
     const b1=-54.4760987982241,b2=161.585836858041,b3=-155.698979859887,b4=66.8013118877197,b5=-13.2806815528857;
@@ -130,6 +146,18 @@
     const se = Math.sqrt(Math.max(0, p1*(1-p1)/n1 + p2*(1-p2)/n2));
     const d  = p2 - p1;
     return { d, lo: d - z*se, hi: d + z*se, se };
+  }
+
+  // pooled SE for two-proportion z-test under H0 (p1 = p2 = p_pool)
+  function zTestTwoProp(p1,n1,p2,n2){
+    const x1 = p1*n1;
+    const x2 = p2*n2;
+    const pPool = (x1 + x2) / (n1 + n2);
+    const se = Math.sqrt(pPool*(1-pPool)*(1/n1 + 1/n2));
+    if (se === 0) return { z: NaN, p: NaN, pPool, se };
+    const z = (p2 - p1)/se;
+    const pval = 2*(1 - normCdf(Math.abs(z))); // two-tailed
+    return { z, p: pval, pPool, se };
   }
 
   // annotations
@@ -159,25 +187,24 @@
     };
   }
 
-  // map CI level radio → alpha and z
   function currentAlpha(){
     const val = document.querySelector('input[name="ci"]:checked').value;
-    const level = parseFloat(val); // 0.90, 0.95, 0.99
+    const level = parseFloat(val); // 0.90 | 0.95 | 0.99
     return 1 - level; // alpha
   }
 
   function render(){
     const p1 = parseFloat(q('p1').value),   p2 = parseFloat(q('p2').value);
     const n1 = parseInt(q('n1').value,10),  n2 = parseInt(q('n2').value,10);
-    const alphaSlider = parseFloat(q('alpha').value);
-    // confidence level radio takes precedence for CI; slider remains for teaching alpha itself if needed
-    const alpha = currentAlpha(); // 0.10 / 0.05 / 0.01
+    // slider alpha kept for pedagogy; CI/test alpha comes from toggle:
+    const alpha = currentAlpha();
     if ([p1,p2,n1,n2,alpha].some(v=>isNaN(v))) return;
-    const z = invNorm(1 - alpha/2);
 
-    // ----- Chart 1: P1 & P2 -----
-    const c1 = ciProp(p1, n1, z);
-    const c2 = ciProp(p2, n2, z);
+    const zCrit = invNorm(1 - alpha/2);
+
+    // ----- Chart 1: Proportions -----
+    const c1 = ciProp(p1, n1, zCrit);
+    const c2 = ciProp(p2, n2, zCrit);
 
     const propTrace = {
       type: "scatter",
@@ -224,7 +251,7 @@
     Plotly.react("propChart", [propTrace], propLayout, {displayModeBar:false});
 
     // ----- Chart 2: Difference -----
-    const cd = ciDiff(p1, n1, p2, n2, z);
+    const cd = ciDiff(p1, n1, p2, n2, zCrit);
 
     const diffTrace = {
       type: "scatter",
@@ -268,6 +295,24 @@
     };
 
     Plotly.react("diffChart", [diffTrace], diffLayout, {displayModeBar:false});
+
+    // ----- Dynamic test sentence (two-proportion z, pooled SE, two-tailed) -----
+    const { z, p, se } = zTestTwoProp(p1, n1, p2, n2);
+    let decision, alphaText = alpha.toFixed(2);
+    if (Number.isNaN(p) || !Number.isFinite(p)) {
+      decision = "insufficient information to compute the test (SE = 0).";
+    } else {
+      decision = (p < alpha)
+        ? `Reject H₀ at α = ${alphaText}.`
+        : `Fail to reject H₀ at α = ${alphaText}.`;
+    }
+
+    q("testSummary").innerHTML =
+      `<div><span class="stat">Two-proportion z-test (two-tailed):</span> `
+      + `z = <span class="stat">${fmt(z,3)}</span>, `
+      + `p-value = <span class="stat">${Number.isFinite(p)?fmt(p,4):"—"}</span>. `
+      + `${decision} `
+      + `The charts below show the ${Math.round((1-alpha)*100)}% CIs for each proportion and for Δ = P₂ − P₁.</div>`;
   }
 
   // ---------- element refs & listeners ----------
@@ -285,7 +330,7 @@
   // CI level radio buttons
   document.getElementById("ciLevelGroup").addEventListener("change", render);
 
-  render(); // initial
+  render(); // initial draw
 </script>
 </body>
 </html>
