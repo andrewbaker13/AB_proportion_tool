@@ -3,18 +3,19 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>A/B Proportion CI – Dot & Whisker (with CI toggle + test summary)</title>
+<title>A/B Proportion CI – Horizontal Dot & Whisker + Custom Labels</title>
 <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 <style>
   body { font-family: system-ui, Segoe UI, Roboto, Arial, sans-serif; margin: 24px; }
   header { display:flex; justify-content:space-between; align-items:baseline; gap:16px; flex-wrap:wrap; }
   h1 { margin:0; font-size:1.2rem; }
   #timestamp { color:#555; font-size:0.9rem; }
-  .controls { display:grid; grid-template-columns: repeat(auto-fit, minmax(280px,1fr)); gap:16px; margin-top:16px; }
+  .controls { display:grid; grid-template-columns: repeat(auto-fit, minmax(320px,1fr)); gap:16px; margin-top:16px; }
   .card { border:1px solid #e3e3e3; border-radius:10px; padding:14px; }
   label { display:block; font-weight:600; margin-top:8px; }
-  input[type="range"], input[type="number"] { width:100%; margin-top:6px; }
-  .row { display:grid; grid-template-columns: 1fr 110px; column-gap:10px; align-items:center; }
+  input[type="range"], input[type="number"], input[type="text"] { width:100%; margin-top:6px; }
+  .row { display:grid; grid-template-columns: 1fr 120px; column-gap:10px; align-items:center; }
+  .row.single { grid-template-columns: 1fr; }
   .hint { color:#666; font-size:0.95rem; margin-top:8px; }
   #propChart, #diffChart { height:380px; margin-top:18px; }
   .segmented { display:inline-flex; border:1px solid #ccc; border-radius:8px; overflow:hidden; }
@@ -25,9 +26,10 @@
   }
   .segmented label:last-child { border-right:none; }
   .segmented input:checked + label { background:#e9eefc; color:#0b48bf; }
-  .toolbar { display:flex; gap:12px; align-items:center; margin-top:10px; }
+  .toolbar { display:flex; gap:12px; align-items:center; margin-top:10px; flex-wrap:wrap; }
   #testSummary { margin-top:10px; padding:10px 12px; border:1px dashed #cfd4e1; border-radius:8px; background:#fafcff; }
   #testSummary .stat { font-weight:700; }
+  .name-inline { font-weight:700; }
 </style>
 </head>
 <body>
@@ -37,20 +39,34 @@
 </header>
 
 <div class="controls">
+  <!-- Names card -->
   <div class="card">
-    <label>P₁ (Control)</label>
+    <label>Group 1 name (default: Control)</label>
+    <div class="row single">
+      <input id="g1name" type="text" maxlength="40" placeholder="Control" value="Control">
+    </div>
+    <label>Group 2 name (default: Variant)</label>
+    <div class="row single">
+      <input id="g2name" type="text" maxlength="40" placeholder="Variant" value="Variant">
+    </div>
+    <p class="hint">These names update the entire page: sliders, test sentence, and chart labels.</p>
+  </div>
+
+  <!-- Proportion & alpha controls -->
+  <div class="card">
+    <label><span class="name-inline" id="g1label_p">Control</span> proportion P₁</label>
     <div class="row">
       <input id="p1" type="range" min="0.01" max="0.5" step="0.005" value="0.10">
       <input id="p1num" type="number" min="0.01" max="0.5" step="0.001" value="0.10">
     </div>
 
-    <label>P₂ (Variant)</label>
+    <label><span class="name-inline" id="g2label_p">Variant</span> proportion P₂</label>
     <div class="row">
       <input id="p2" type="range" min="0.01" max="0.5" step="0.005" value="0.13">
       <input id="p2num" type="number" min="0.01" max="0.5" step="0.001" value="0.13">
     </div>
 
-    <!-- α slider stays for teaching, but CI level toggle controls the intervals and test decision -->
+    <!-- alpha slider kept for pedagogy; CI/test level comes from toggle -->
     <label>α (Significance level – teaching slider)</label>
     <div class="row">
       <input id="alpha" type="range" min="0.005" max="0.2" step="0.005" value="0.05">
@@ -58,14 +74,15 @@
     </div>
   </div>
 
+  <!-- Sample sizes + CI toggle -->
   <div class="card">
-    <label>n₁ (Control sample size)</label>
+    <label>n₁ sample size for <span class="name-inline" id="g1label_n">Control</span></label>
     <div class="row">
       <input id="n1" type="range" min="10" max="20000" step="10" value="300">
       <input id="n1num" type="number" min="1" step="1" value="300">
     </div>
 
-    <label>n₂ (Variant sample size)</label>
+    <label>n₂ sample size for <span class="name-inline" id="g2label_n">Variant</span></label>
     <div class="row">
       <input id="n2" type="range" min="10" max="20000" step="10" value="300">
       <input id="n2num" type="number" min="1" step="1" value="300">
@@ -83,14 +100,11 @@
       </div>
     </div>
 
-    <!-- Dynamic statistical interpretation lives here -->
     <div id="testSummary" class="hint"></div>
-
-    <p class="hint">Point = large red dot with black label to the right. Whiskers = prominent CI with labeled bounds. CI/test level is controlled by the toggle above.</p>
   </div>
 </div>
 
-<h3>Proportions (P₁, P₂) with CI</h3>
+<h3>Proportions with CI</h3>
 <div id="propChart"></div>
 
 <h3>Difference (Δ = P₂ − P₁) with CI</h3>
@@ -124,7 +138,7 @@
   }
   function normCdf(x){ return 0.5*(1+erf(x/Math.SQRT2)); }
 
-  // inverse normal (Abramowitz–Stegun) → for CI z
+  // inverse normal (Abramowitz–Stegun)
   function invNorm(p){
     const a1=-39.6968302866538,a2=220.946098424521,a3=-275.928510446969,a4=138.357751867269,a5=-30.6647980661472,a6=2.50662827745924;
     const b1=-54.4760987982241,b2=161.585836858041,b3=-155.698979859887,b4=66.8013118877197,b5=-13.2806815528857;
@@ -148,10 +162,9 @@
     return { d, lo: d - z*se, hi: d + z*se, se };
   }
 
-  // pooled SE for two-proportion z-test under H0 (p1 = p2 = p_pool)
+  // pooled SE for two-proportion z-test under H0
   function zTestTwoProp(p1,n1,p2,n2){
-    const x1 = p1*n1;
-    const x2 = p2*n2;
+    const x1 = p1*n1, x2 = p2*n2;
     const pPool = (x1 + x2) / (n1 + n2);
     const se = Math.sqrt(pPool*(1-pPool)*(1/n1 + 1/n2));
     if (se === 0) return { z: NaN, p: NaN, pPool, se };
@@ -160,25 +173,43 @@
     return { z, p: pval, pPool, se };
   }
 
-  // annotations
-  function pointAnnotation(x, y, text){
+  // names (sanitize, default, max 40 via HTML attr)
+  function getNames(){
+    let g1 = q("g1name").value.trim() || "Control";
+    let g2 = q("g2name").value.trim() || "Variant";
+    // collapse whitespace and clip again just in case
+    g1 = g1.replace(/\s+/g, " ").slice(0,40);
+    g2 = g2.replace(/\s+/g, " ").slice(0,40);
+    return { g1, g2 };
+  }
+
+  function updateNameSpans(){
+    const { g1, g2 } = getNames();
+    q("g1label_p").textContent = g1;
+    q("g2label_p").textContent = g2;
+    q("g1label_n").textContent = g1;
+    q("g2label_n").textContent = g2;
+  }
+
+  // annotations – now horizontal (x = value, y = category)
+  function pointAnnotation(x, yCat, text){
     return {
-      x, y, text,
+      x, y: yCat, text,
       xref: "x", yref: "y",
       showarrow: false,
       font: { size: 12, color: "#000", family: "inherit" }, // black text
       align: "left",
-      xshift: 14,  // to the right of the dot
+      xshift: 14,  // label to the right of the dot
       yanchor: "middle",
       bgcolor: "rgba(255,255,255,0.6)",
       bordercolor: "rgba(0,0,0,0.15)",
       borderwidth: 1, borderpad: 2
     };
   }
-  function boundAnnotation(x, y, text, side){
-    const xshift = side === "lo" ? -24 : 24;
+  function boundAnnotation(x, yCat, text, side){
+    const xshift = side === "lo" ? -24 : 24; // left or right of whisker end
     return {
-      x, y, text,
+      x, y: yCat, text,
       xref: "x", yref: "y",
       showarrow: false,
       font: { size: 12, color: CI_COLOR, family: "inherit" },
@@ -187,6 +218,7 @@
     };
   }
 
+  // CI level from segmented control
   function currentAlpha(){
     const val = document.querySelector('input[name="ci"]:checked').value;
     const level = parseFloat(val); // 0.90 | 0.95 | 0.99
@@ -194,32 +226,34 @@
   }
 
   function render(){
+    updateNameSpans();
+    const { g1, g2 } = getNames();
+
     const p1 = parseFloat(q('p1').value),   p2 = parseFloat(q('p2').value);
     const n1 = parseInt(q('n1').value,10),  n2 = parseInt(q('n2').value,10);
-    // slider alpha kept for pedagogy; CI/test alpha comes from toggle:
     const alpha = currentAlpha();
     if ([p1,p2,n1,n2,alpha].some(v=>isNaN(v))) return;
 
     const zCrit = invNorm(1 - alpha/2);
 
-    // ----- Chart 1: Proportions -----
+    // ----- Chart 1: Proportions (horizontal) -----
     const c1 = ciProp(p1, n1, zCrit);
     const c2 = ciProp(p2, n2, zCrit);
 
     const propTrace = {
       type: "scatter",
       mode: "markers",
-      x: ["P₁ (control)", "P₂ (variant)"],
-      y: [p1, p2],
+      x: [p1, p2],
+      y: [g1, g2],
       marker: {
         color: RED, size: 22,
         line: { color: RED, width: 2 },
         symbol: "circle"
       },
-      error_y: {
+      error_x: {
         type: "data",
-        array: [c1.hi - p1, c2.hi - p2],
-        arrayminus: [p1 - c1.lo, p2 - c2.lo],
+        array: [c1.hi - p1, c2.hi - p2],      // + error in x
+        arrayminus: [p1 - c1.lo, p2 - c2.lo], // - error in x
         visible: true,
         color: CI_COLOR,
         thickness: 4,
@@ -230,40 +264,40 @@
     };
 
     const propAnn = [
-      pointAnnotation("P₁ (control)", p1, pct(p1)),
-      pointAnnotation("P₂ (variant)", p2, pct(p2)),
-      boundAnnotation("P₁ (control)", c1.lo, pct(c1.lo), "lo"),
-      boundAnnotation("P₁ (control)", c1.hi, pct(c1.hi), "hi"),
-      boundAnnotation("P₂ (variant)", c2.lo, pct(c2.lo), "lo"),
-      boundAnnotation("P₂ (variant)", c2.hi, pct(c2.hi), "hi")
+      pointAnnotation(p1, g1, pct(p1)),
+      pointAnnotation(p2, g2, pct(p2)),
+      boundAnnotation(c1.lo, g1, pct(c1.lo), "lo"),
+      boundAnnotation(c1.hi, g1, pct(c1.hi), "hi"),
+      boundAnnotation(c2.lo, g2, pct(c2.lo), "lo"),
+      boundAnnotation(c2.hi, g2, pct(c2.hi), "hi")
     ];
 
     const propMax = Math.min(1, Math.max(c1.hi, c2.hi) * 1.15);
     const propLayout = {
       title: `Proportions with ${Math.round((1-alpha)*100)}% CI (n₁=${n1.toLocaleString()}, n₂=${n2.toLocaleString()})`,
-      yaxis: { title: "Proportion", range: [0, propMax], tickformat: ",.0%" },
-      xaxis: { tickangle: -2 },
-      margin: { t: 60, l: 70, r: 20, b: 60 },
+      xaxis: { title: "Proportion", range: [0, propMax], tickformat: ",.0%" },
+      yaxis: { title: "", automargin: true },
+      margin: { t: 60, l: 120, r: 20, b: 60 },
       showlegend: false,
       annotations: propAnn
     };
 
     Plotly.react("propChart", [propTrace], propLayout, {displayModeBar:false});
 
-    // ----- Chart 2: Difference -----
+    // ----- Chart 2: Difference (horizontal) -----
     const cd = ciDiff(p1, n1, p2, n2, zCrit);
 
     const diffTrace = {
       type: "scatter",
       mode: "markers",
-      x: ["Δ = P₂ − P₁"],
-      y: [cd.d],
+      x: [cd.d],
+      y: [`Δ = ${g2} − ${g1}`],
       marker: {
         color: RED, size: 22,
         line: { color: RED, width: 2 },
         symbol: "circle"
       },
-      error_y: {
+      error_x: {
         type: "data",
         array: [cd.hi - cd.d],
         arrayminus: [cd.d - cd.lo],
@@ -279,40 +313,38 @@
     const m = Math.max(Math.abs(cd.hi), Math.abs(cd.lo));
     const pad = Math.max(0.01, m * 0.25);
     const diffAnn = [
-      pointAnnotation("Δ = P₂ − P₁", cd.d, pct(cd.d)),
-      boundAnnotation("Δ = P₂ − P₁", cd.lo, pct(cd.lo), "lo"),
-      boundAnnotation("Δ = P₂ − P₁", cd.hi, pct(cd.hi), "hi")
+      pointAnnotation(cd.d, `Δ = ${g2} − ${g1}`, pct(cd.d)),
+      boundAnnotation(cd.lo, `Δ = ${g2} − ${g1}`, pct(cd.lo), "lo"),
+      boundAnnotation(cd.hi, `Δ = ${g2} − ${g1}`, pct(cd.hi), "hi")
     ];
     const diffLayout = {
       title: `Difference with ${Math.round((1-alpha)*100)}% CI`,
-      yaxis: { title: "Δ (proportion)", range: [-(m+pad), (m+pad)], tickformat: "+,.1%" },
+      xaxis: { title: "Δ (proportion)", range: [-(m+pad), (m+pad)], tickformat: "+,.1%" },
+      yaxis: { title: "", automargin: true },
       shapes: [{
-        type: "line", x0: -0.5, x1: 1.5, y0: 0, y1: 0, line: { width: 1, dash: "dot", color: "#777" }
+        type: "line", x0: 0, x1: 0, y0: -0.5, y1: 1.5,
+        line: { width: 1, dash: "dot", color: "#777" }
       }],
-      margin: { t: 60, l: 70, r: 20, b: 60 },
+      margin: { t: 60, l: 120, r: 20, b: 60 },
       showlegend: false,
       annotations: diffAnn
     };
 
     Plotly.react("diffChart", [diffTrace], diffLayout, {displayModeBar:false});
 
-    // ----- Dynamic test sentence (two-proportion z, pooled SE, two-tailed) -----
-    const { z, p, se } = zTestTwoProp(p1, n1, p2, n2);
-    let decision, alphaText = alpha.toFixed(2);
-    if (Number.isNaN(p) || !Number.isFinite(p)) {
-      decision = "insufficient information to compute the test (SE = 0).";
-    } else {
-      decision = (p < alpha)
-        ? `Reject H₀ at α = ${alphaText}.`
-        : `Fail to reject H₀ at α = ${alphaText}.`;
-    }
+    // ----- Dynamic test sentence (two-tailed pooled z-test) -----
+    const { z, p } = zTestTwoProp(p1, n1, p2, n2);
+    const decision = (Number.isFinite(p) && p < alpha)
+      ? `Reject H₀ at α = ${alpha.toFixed(2)}.`
+      : `Fail to reject H₀ at α = ${alpha.toFixed(2)}.`;
 
     q("testSummary").innerHTML =
       `<div><span class="stat">Two-proportion z-test (two-tailed):</span> `
+      + `${g1} vs. ${g2}: `
       + `z = <span class="stat">${fmt(z,3)}</span>, `
       + `p-value = <span class="stat">${Number.isFinite(p)?fmt(p,4):"—"}</span>. `
       + `${decision} `
-      + `The charts below show the ${Math.round((1-alpha)*100)}% CIs for each proportion and for Δ = P₂ − P₁.</div>`;
+      + `Charts reflect the selected ${Math.round((1-alpha)*100)}% CI.</div>`;
   }
 
   // ---------- element refs & listeners ----------
@@ -321,16 +353,20 @@
   const alphaEl=q("alpha"), alphaNum=q("alphanum");
   const n1El=q("n1"), n1Num=q("n1num");
   const n2El=q("n2"), n2Num=q("n2num");
+  const g1El=q("g1name"), g2El=q("g2name");
 
   [[p1El,p1Num],[p2El,p2Num],[alphaEl,alphaNum],[n1El,n1Num],[n2El,n2Num]].forEach(([r,n])=>{
     r.addEventListener("input", ()=>{ n.value=r.value; render(); });
     n.addEventListener("input", ()=>{ r.value=n.value; render(); });
   });
 
+  [g1El, g2El].forEach(el => el.addEventListener("input", render));
+
   // CI level radio buttons
   document.getElementById("ciLevelGroup").addEventListener("change", render);
 
-  render(); // initial draw
+  // initial draw
+  render();
 </script>
 </body>
 </html>
