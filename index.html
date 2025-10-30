@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>A/B Proportion Tool – CIs, Two-Proportion z-Test, APA & Managerial Write-ups</title>
+<title>A/B Proportion Tool – Fan Charts, CIs, Two-Proportion z-Test</title>
 <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 <!-- MathJax for formulas -->
 <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
@@ -19,7 +19,6 @@
   input[type="range"], input[type="number"], input[type="text"] { width:100%; margin-top:6px; }
   .row { display:grid; grid-template-columns: 1fr 120px; column-gap:10px; align-items:center; }
   .row.single { grid-template-columns: 1fr; }
-  .row.axis { grid-template-columns: 160px 1fr 90px 90px; column-gap:10px; align-items:center; }
   .divider { border-top:1px dashed #d6dae6; margin:14px 0; }
   .hint { color:#555; font-size:0.95rem; margin-top:8px; }
   .segmented { display:inline-flex; border:1px solid #ccc; border-radius:8px; overflow:hidden; }
@@ -37,20 +36,22 @@
   #apaWriteup { margin:4px 0; }
   #mgrWriteup { margin:8px 0 0 0; }
 
-  #propChart, #diffChart { height:380px; margin-top:18px; }
+  #propChart, #diffChart { height:420px; margin-top:18px; }
   .summary-wrap { margin-top:22px; }
   table.summary { border-collapse:collapse; width:100%; }
   .summary th, .summary td { border:1px solid #e3e3e3; padding:8px 10px; text-align:left; }
   .summary thead th { background:#f7f9ff; font-weight:700; }
   .mono { font-variant-numeric: tabular-nums; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+
   .muted { color:#6b7280; font-size:0.9rem; }
+  .row.axis { display:grid; grid-template-columns: 200px 1fr 100px 100px; column-gap:10px; align-items:center; }
   .btn { padding:6px 10px; border:1px solid #cbd5e1; border-radius:8px; background:#f8fafc; cursor:pointer; font-weight:600; }
   .btn:hover { background:#eef2f7; }
 </style>
 </head>
 <body>
 <header>
-  <h1>A/B Proportions – Confidence Intervals & Two-Proportion z-Test</h1>
+  <h1>A/B Proportions – Fan Charts, Confidence Intervals & Two-Proportion z-Test</h1>
   <div id="timestamp"></div>
 </header>
 
@@ -71,8 +72,7 @@
   </p>
   <p class="hint"><strong>How to use this tool:</strong> Use when comparing <em>two independent groups</em> on a binary outcome.
     Provide: (1) the observed proportions (or best estimates) for each group, and (2) each group’s sample size.
-    Proportions and sample sizes typically come from your data system or statistical software; enter them here to view
-    confidence intervals, the hypothesis test, and ready-to-paste APA/managerial write-ups.</p>
+    Enter them here to view fan-chart intervals (50/80/selected), hypothesis test, write-ups, and a summary table.</p>
 </div>
 
 <div class="controls">
@@ -122,7 +122,7 @@
     <h3>Confidence Level & Reporting</h3>
 
     <div class="toolbar">
-      <div><strong>Confidence level (affects CIs & test decision):</strong></div>
+      <div><strong>Confidence level (affects outer band & test decision):</strong></div>
       <div class="segmented" id="ciLevelGroup">
         <input type="radio" id="ci90" name="ci" value="0.90">
         <label for="ci90">90%</label>
@@ -140,40 +140,39 @@
       <p id="mgrWriteup"></p>
     </div>
   </div>
-
-  <!-- BOX C: Chart Axis Settings -->
-  <div class="card" id="boxC">
-    <h3>Chart Axis Settings</h3>
-
-    <!-- Proportions axis lock -->
-    <div class="row axis">
-      <label><input type="checkbox" id="lockPropAxis"> Lock proportions x-axis</label>
-      <span class="muted">Range (%):</span>
-      <input id="propMin" type="number" step="1" value="0" aria-label="Proportion axis min percent">
-      <input id="propMax" type="number" step="1" value="60" aria-label="Proportion axis max percent">
-    </div>
-    <p class="hint muted">When locked, the Proportions chart uses the given percent range (e.g., 0 to 60 shows 0%–60%).</p>
-
-    <!-- Difference axis lock -->
-    <div class="row axis" style="margin-top:12px;">
-      <label><input type="checkbox" id="lockDiffAxis"> Lock difference x-axis</label>
-      <span class="muted">Range (pct.pts):</span>
-      <input id="diffMin" type="number" step="1" value="-20" aria-label="Difference axis min pct pts">
-      <input id="diffMax" type="number" step="1" value="20" aria-label="Difference axis max pct pts">
-    </div>
-    <p class="hint muted">When locked, the Difference chart uses the given bounds in percentage points (e.g., −20 to 20).</p>
-
-    <div style="margin-top:12px;">
-      <button id="resetAxes" class="btn" type="button">Reset axes to auto</button>
-    </div>
-  </div>
 </div>
 
-<h3 id="propTitle">Proportions with CI</h3>
+<h3 id="propTitle">Proportions with Fan Chart</h3>
 <div id="propChart"></div>
 
-<h3 id="diffTitle">Difference (Δ) with CI</h3>
+<h3 id="diffTitle">Difference (Δ) with Fan Chart</h3>
 <div id="diffChart"></div>
+
+<!-- BOX C: Chart Axis Settings (now below the charts) -->
+<div class="card" id="boxC">
+  <h3>Chart Axis Settings</h3>
+  <!-- Proportions axis lock -->
+  <div class="row axis">
+    <label><input type="checkbox" id="lockPropAxis"> Lock proportions x-axis</label>
+    <span class="muted">Range (%):</span>
+    <input id="propMin" type="number" step="1" value="0" aria-label="Proportion axis min percent">
+    <input id="propMax" type="number" step="1" value="60" aria-label="Proportion axis max percent">
+  </div>
+  <p class="hint muted">When locked, the Proportions chart uses the given percent range (e.g., 0 to 60 shows 0%–60%).</p>
+
+  <!-- Difference axis lock -->
+  <div class="row axis" style="margin-top:12px;">
+    <label><input type="checkbox" id="lockDiffAxis"> Lock difference x-axis</label>
+    <span class="muted">Range (pct.pts):</span>
+    <input id="diffMin" type="number" step="1" value="-20" aria-label="Difference axis min pct pts">
+    <input id="diffMax" type="number" step="1" value="20" aria-label="Difference axis max pct pts">
+  </div>
+  <p class="hint muted">When locked, the Difference chart uses the given bounds in percentage points (e.g., −20 to 20).</p>
+
+  <div style="margin-top:12px;">
+    <button id="resetAxes" class="btn" type="button">Reset axes to auto</button>
+  </div>
+</div>
 
 <!-- Summary table -->
 <div class="summary-wrap">
@@ -209,7 +208,7 @@
   const CI_COLOR = "#222";
 
   function pct(x, d=1){ return (x*100).toFixed(d) + "%"; }
-  function ppLabel(x, d=1){ return (x>=0?"+":"") + (x*100).toFixed(d) + " pct.pts"; } // percentage points label
+  function ppLabel(x, d=1){ return (x>=0?"+":"") + (x*100).toFixed(d) + " pct.pts"; } // percentage points
   function fmt(x,n=3){ return Number(x).toFixed(n); }
 
   // erf approximation + normal CDF
@@ -339,7 +338,6 @@
       { measure: "Proportion", label: g2, val: pct(p2,1), lo: pct(c2.lo,1), hi: pct(c2.hi,1), n: n2.toLocaleString() },
       { measure: "Difference (pct.pts)", label: `${g2} − ${g1}`, val: ppLabel(cd.d,1), lo: ppLabel(cd.lo,1), hi: ppLabel(cd.hi,1), n: `${n2.toLocaleString()} vs ${n1.toLocaleString()}` }
     ];
-    // Update CI column headers with level
     q("ciLowerHeader").textContent = `CI Lower (${levelPct}%)`;
     q("ciUpperHeader").textContent = `CI Upper (${levelPct}%)`;
     q("summaryBody").innerHTML = rows.map(r => `
@@ -374,6 +372,20 @@
     return [minPP/100, maxPP/100]; // pct.pts to proportion differences
   }
 
+  // Fan-chart shapes (horizontal rectangles)
+  function makeBandRect(x0, x1, yCenter, halfHeight, fill, opacity){
+    return {
+      type: "rect",
+      xref: "x", yref: "y",
+      x0, x1,
+      y0: yCenter - halfHeight,
+      y1: yCenter + halfHeight,
+      line: { width: 0 },
+      fillcolor: fill,
+      opacity
+    };
+  }
+
   function render(){
     updateNameSpans();
     const names = getNames();
@@ -384,27 +396,46 @@
     const alpha = currentAlpha();
     if ([p1,p2,n1,n2,alpha].some(v=>isNaN(v))) return;
 
-    const zCrit = invNorm(1 - alpha/2);
-    const c1 = ciProp(p1, n1, zCrit);
-    const c2 = ciProp(p2, n2, zCrit);
-    const cd = ciDiff(p1, n1, p2, n2, zCrit);
+    // z-values for 50%, 80%, and selected level
+    const z50 = invNorm(1 - (1-0.50)/2);
+    const z80 = invNorm(1 - (1-0.80)/2);
+    const zSel = invNorm(1 - alpha/2);
     const levelPct = Math.round((1 - alpha) * 100);
 
-    // ----- Chart 1 (horizontal proportions) -----
+    // CIs
+    const c1_50 = ciProp(p1, n1, z50), c1_80 = ciProp(p1, n1, z80), c1 = ciProp(p1, n1, zSel);
+    const c2_50 = ciProp(p2, n2, z50), c2_80 = ciProp(p2, n2, z80), c2 = ciProp(p2, n2, zSel);
+    const cd_50 = ciDiff(p1, n1, p2, n2, z50), cd_80 = ciDiff(p1, n1, p2, n2, z80), cd = ciDiff(p1, n1, p2, n2, zSel);
+
+    // ----- Chart 1 (Proportions with fan bands) -----
+    const propCats = [g1, g2];
+    const propHalf = 0.20; // band half-height for proportions rows
+
+    // axis range
+    const propMaxAuto = Math.min(1, Math.max(c1.hi, c2.hi) * 1.15);
+    const propRange = getLockedPropRange() || [0, propMaxAuto];
+
+    const propShapes = [
+      // Group 1: 50/80/selected
+      makeBandRect(Math.max(0,c1_50.lo), Math.min(1,c1_50.hi), g1, propHalf*0.7, "#9bb1ff", 0.45),
+      makeBandRect(Math.max(0,c1_80.lo), Math.min(1,c1_80.hi), g1, propHalf*0.9, "#b9c8ff", 0.35),
+      makeBandRect(Math.max(0,c1.lo),    Math.min(1,c1.hi),    g1, propHalf,     "#d8e2ff", 0.25),
+      // Group 2
+      makeBandRect(Math.max(0,c2_50.lo), Math.min(1,c2_50.hi), g2, propHalf*0.7, "#9bb1ff", 0.45),
+      makeBandRect(Math.max(0,c2_80.lo), Math.min(1,c2_80.hi), g2, propHalf*0.9, "#b9c8ff", 0.35),
+      makeBandRect(Math.max(0,c2.lo),    Math.min(1,c2.hi),    g2, propHalf,     "#d8e2ff", 0.25),
+    ];
+
     const propTrace = {
       type: "scatter",
       mode: "markers",
       x: [p1, p2],
-      y: [g1, g2],
+      y: propCats,
       marker: { color: RED, size: 22, line: { color: RED, width: 2 }, symbol: "circle" },
-      error_x: {
-        type: "data",
-        array: [c1.hi - p1, c2.hi - p2],
-        arrayminus: [p1 - c1.lo, p2 - c2.lo],
-        visible: true, color: CI_COLOR, thickness: 4, width: 12
-      },
       hoverinfo: "x+y", name: "Estimate"
     };
+
+    // Only label bounds for the outermost (selected) band
     const propAnn = [
       pointAnnotation(p1, g1, pct(p1,1)),
       pointAnnotation(p2, g2, pct(p2,1)),
@@ -413,58 +444,67 @@
       boundAnnotation(c2.lo, g2, pct(c2.lo,1), "lo"),
       boundAnnotation(c2.hi, g2, pct(c2.hi,1), "hi")
     ];
-    const propMaxAuto = Math.min(1, Math.max(c1.hi, c2.hi) * 1.15);
-    const propRange = getLockedPropRange() || [0, propMaxAuto];
 
     const propLayout = {
-      title: `Estimated Proportions for ${g1} and ${g2} with ${levelPct}% Confidence Intervals`,
+      title: `Estimated Proportions for ${g1} and ${g2} with Fan Bands (50%, 80%, ${levelPct}%)`,
       xaxis: { title: "Proportion", range: propRange, tickformat: ",.0%" },
       yaxis: { title: "", automargin: true },
-      margin: { t: 60, l: 160, r: 20, b: 60 },
-      showlegend: false, annotations: propAnn
+      margin: { t: 60, l: 180, r: 20, b: 60 },
+      showlegend: false,
+      shapes: propShapes,
+      annotations: propAnn
     };
     Plotly.react("propChart", [propTrace], propLayout, {displayModeBar:false});
-    q("propTitle").textContent = `Proportions for ${g1} and ${g2} (${levelPct}% CI)`;
+    q("propTitle").textContent = `Proportions for ${g1} and ${g2} — Fan Chart (50/80/${levelPct}%)`;
 
-    // ----- Chart 2 (horizontal difference) -----
+    // ----- Chart 2 (Difference fan band) -----
+    const diffCat = [`Δ = ${g2} − ${g1}`];
+    const diffHalf = 0.20;
+
+    // auto range vs locked
     const m = Math.max(Math.abs(cd.hi), Math.abs(cd.lo));
     const pad = Math.max(0.01, m * 0.25);
+    const diffRange = getLockedDiffRange() || [-(m+pad), (m+pad)];
+
+    const diffShapes = [
+      makeBandRect(cd_50.lo, cd_50.hi, diffCat[0], diffHalf*0.7, "#9bb1ff", 0.45),
+      makeBandRect(cd_80.lo, cd_80.hi, diffCat[0], diffHalf*0.9, "#b9c8ff", 0.35),
+      makeBandRect(cd.lo,    cd.hi,    diffCat[0], diffHalf,     "#d8e2ff", 0.25),
+      // zero line (as a thin shape for clarity)
+      { type:"line", xref:"x", yref:"paper", x0:0, x1:0, y0:0, y1:1, line:{ width:1, dash:"dot", color:"#777" } }
+    ];
+
     const diffTrace = {
       type: "scatter",
       mode: "markers",
       x: [cd.d],
-      y: [`Δ = ${g2} − ${g1}`],
+      y: diffCat,
       marker: { color: RED, size: 22, line: { color: RED, width: 2 }, symbol: "circle" },
-      error_x: {
-        type: "data",
-        array: [cd.hi - cd.d],
-        arrayminus: [cd.d - cd.lo],
-        visible: true, color: CI_COLOR, thickness: 4, width: 12
-      },
       hoverinfo: "x+y", name: "Difference"
     };
-    const diffRange = getLockedDiffRange() || [-(m+pad), (m+pad)];
 
     const diffAnn = [
-      pointAnnotation(cd.d, `Δ = ${g2} − ${g1}`, ppLabel(cd.d,1)),
-      boundAnnotation(cd.lo, `Δ = ${g2} − ${g1}`, ppLabel(cd.lo,1), "lo"),
-      boundAnnotation(cd.hi, `Δ = ${g2} − ${g1}`, ppLabel(cd.hi,1), "hi")
+      pointAnnotation(cd.d, diffCat[0], ppLabel(cd.d,1)),
+      boundAnnotation(cd.lo, diffCat[0], ppLabel(cd.lo,1), "lo"),
+      boundAnnotation(cd.hi, diffCat[0], ppLabel(cd.hi,1), "hi")
     ];
+
     const diffLayout = {
-      title: `Difference in Proportions (${g2} − ${g1}) with ${levelPct}% Confidence Interval`,
+      title: `Difference in Proportions (${g2} − ${g1}) with Fan Bands (50%, 80%, ${levelPct}%)`,
       xaxis: { title: "Difference (pct.pts)", range: diffRange, tickformat: "+,.1%" },
       yaxis: { title: "", automargin: true },
-      shapes: [{ type: "line", x0: 0, x1: 0, y0: -0.5, y1: 1.5, line: { width: 1, dash: "dot", color: "#777" } }],
-      margin: { t: 60, l: 200, r: 20, b: 60 },
-      showlegend: false, annotations: diffAnn
+      margin: { t: 60, l: 220, r: 20, b: 60 },
+      showlegend: false,
+      shapes: diffShapes,
+      annotations: diffAnn
     };
     Plotly.react("diffChart", [diffTrace], diffLayout, {displayModeBar:false});
-    q("diffTitle").textContent = `Difference in Proportions (${g2} − ${g1}) — ${levelPct}% CI`;
+    q("diffTitle").textContent = `Difference in Proportions (${g2} − ${g1}) — Fan Chart (50/80/${levelPct}%)`;
 
     // ----- Test + write-ups -----
     const { z, p } = zTestTwoProp(p1, n1, p2, n2);
     const { apa, mgr } = buildWriteups({g1,g2}, p1, n1, p2, n2, alpha, z, p, cd, levelPct);
-    q("apaWriteup").textContent = apa;           // match font with managerial section
+    q("apaWriteup").textContent = apa;
     q("mgrWriteup").textContent = mgr;
 
     // ----- Summary table -----
