@@ -1,141 +1,172 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>StudyFlow: A/B Test Sample Size & Power Tool</title>
-
-  <!-- Link to external CSS file -->
-  <link rel="stylesheet" href="styles.css" />
-
-  <!-- Plotly Library for visualization -->
+  <meta charset="utf-8" />
+  <title>AB Tool – Minimal Working Example</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- Plotly -->
   <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
-
-  <!-- MathJax for LaTeX rendering -->
-  <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
-  <script id="MathJax-script" async
-    src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
-
   <style>
-    #timestamp {
-      text-align: right;
-      font-size: 0.85rem;
-      color: #555;
-      margin-right: 1rem;
-    }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 24px; }
+    header { display:flex; justify-content:space-between; align-items:baseline; gap:16px; flex-wrap:wrap; }
+    h1 { margin:0; font-size:1.25rem; }
+    #timestamp { color:#555; font-size:0.9rem; }
+    .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(260px,1fr)); gap:16px; margin-top:16px; }
+    .card { border:1px solid #e3e3e3; border-radius:10px; padding:14px; }
+    .row { display:flex; align-items:center; gap:10px; margin-top:8px; }
+    label { width:130px; font-weight:600; }
+    input[type="range"] { width:100%; }
+    input[type="number"] { width:90px; }
+    .muted { color:#666; font-size:0.9rem; }
+    #plot { height:340px; margin-top:16px; }
+    .metric { font-weight:600; font-size:1.05rem; }
+    code { background:#f6f6f6; padding:2px 6px; border-radius:5px; }
   </style>
 </head>
-
 <body>
-  <div id="timestamp"></div>
+  <header>
+    <h1>StudyFlow A/B Test (Minimal Working Example)</h1>
+    <div id="timestamp"></div>
+  </header>
 
-  <!-- Title -->
-  <h1>StudyFlow Influencer A/B Test Planner</h1>
-
-  <!-- Context Section -->
-  <div class="intro">
-    <p>
-      <strong>Context:</strong> As a Data Analyst for StudyFlow (a student study-habit SaaS), your job is to compare the conversion rates of two marketing channels: your current partner, <strong>Influencer Alpha</strong> (Control Group $P_1$), versus the new, more expensive <strong>Influencer Beta</strong> (Variant $P_2$).
-    </p>
-    <p>
-      This tool helps you determine the <strong>Required Sample Size</strong> ($N$ per group) needed for a valid A/B test by adjusting the statistical parameters below.
-    </p>
-    <p class="equation">
-      <strong>Required Sample Size (N) Formula:</strong>
-      $$N = \frac{\left[z_{1-\alpha} \sqrt{2P_{pool}(1-P_{pool})} + z_{1-\beta} \sqrt{P_1(1-P_1) + P_2(1-P_2)}\right]^2}{\delta^2}$$
-    </p>
-  </div>
-
-  <div id="metrics" class="metrics-panel">
-    <h2>A/B Test Outcomes</h2>
-    <p id="sample_size" class="metric-output"></p>
-    <p id="p2_rate" class="metric-output"></p>
-  </div>
-
-  <hr class="separator" />
-
-  <!-- Controls -->
-  <h3>Test Parameters (What You Decide)</h3>
-  <div class="controls-container">
-    <div class="control-column">
-      <h4>Conversion Rate Assumptions</h4>
-
-      <!-- P1 -->
-      <div class="control-group">
-        <label>
-          P₁ (Alpha's Current Conversion Rate):
-          <input type="range" id="p1Slider" min="0.05" max="0.30" step="0.01" value="0.10" />
-          <input type="number" id="p1Number" min="0.05" max="0.30" step="0.001" value="0.10" />
-          <span id="p1Display" class="display-value">10%</span>
-        </label>
+  <div class="grid">
+    <div class="card">
+      <div class="row">
+        <label for="p1">P₁ (control)</label>
+        <input id="p1" type="range" min="0.01" max="0.40" step="0.005" value="0.10">
+        <input id="p1_num" type="number" min="0.01" max="0.40" step="0.001" value="0.10">
+        <span id="p1_out">10.0%</span>
       </div>
-
-      <!-- P2 -->
-      <div class="control-group">
-        <label>
-          P₂ (Beta's Expected Conversion Rate):
-          <input type="range" id="p2Slider" min="0.05" max="0.30" step="0.01" value="0.13" />
-          <input type="number" id="p2Number" min="0.05" max="0.30" step="0.001" value="0.13" />
-          <span id="p2Display" class="display-value">13%</span>
-        </label>
+      <div class="row">
+        <label for="p2">P₂ (variant)</label>
+        <input id="p2" type="range" min="0.01" max="0.40" step="0.005" value="0.13">
+        <input id="p2_num" type="number" min="0.01" max="0.40" step="0.001" value="0.13">
+        <span id="p2_out">13.0%</span>
       </div>
-
-      <!-- Δ -->
-      <div class="control-group">
-        <label>
-          Δ (Observed Lift: |P₂ – P₁|):
-          <span id="deltaDisplay" class="display-value">3%</span>
-        </label>
+      <div class="row muted">
+        <label>Δ = |P₂ − P₁|</label>
+        <span id="delta_out" class="metric">3.0%</span>
       </div>
     </div>
 
-    <div class="control-column">
-      <h4>Confidence & Risk Settings</h4>
-
-      <!-- Alpha -->
-      <div class="control-group">
-        <label>
-          α (Significance Level):
-          <input type="range" id="alphaSlider" min="0.01" max="0.20" step="0.01" value="0.05" />
-          <input type="number" id="alphaNumber" min="0.01" max="0.20" step="0.001" value="0.05" />
-          <span id="alphaDisplay" class="display-value">0.05</span>
-        </label>
+    <div class="card">
+      <div class="row">
+        <label for="alpha">α</label>
+        <input id="alpha" type="range" min="0.005" max="0.20" step="0.005" value="0.05">
+        <input id="alpha_num" type="number" min="0.005" max="0.20" step="0.001" value="0.05">
+        <span id="alpha_out">0.05</span>
       </div>
-
-      <!-- Power -->
-      <div class="control-group">
-        <label>
-          Power (1–β):
-          <input type="range" id="powerSlider" min="0.70" max="0.99" step="0.01" value="0.80" />
-          <input type="number" id="powerNumber" min="0.70" max="0.99" step="0.001" value="0.80" />
-          <span id="powerDisplay" class="display-value">0.80</span>
-        </label>
+      <div class="row">
+        <label for="power">Power</label>
+        <input id="power" type="range" min="0.70" max="0.99" step="0.01" value="0.80">
+        <input id="power_num" type="number" min="0.70" max="0.99" step="0.001" value="0.80">
+        <span id="power_out">0.80</span>
+      </div>
+      <div class="row muted">
+        <label>N per group</label>
+        <span id="n_out" class="metric">—</span>
       </div>
     </div>
   </div>
-
-  <hr class="separator" />
 
   <div id="plot"></div>
 
-  <div id="questions">
-    <h3>Exploratory Questions for StudyFlow Analysts</h3>
-    <ol>
-      <li>What happens to $N$ when you decrease α?</li>
-      <li>Why does a larger Δ drastically decrease the required sample size?</li>
-      <li>Should you prefer higher Power or lower α when Beta is expensive?</li>
-    </ol>
-  </div>
-
-  <script src="app.js" defer></script>
-
   <script>
-    // Timestamp display
-    document.addEventListener("DOMContentLoaded", () => {
+    // ---------- timestamp ----------
+    (function() {
       const ts = new Date();
-      const formatted = ts.toLocaleString();
-      document.getElementById("timestamp").textContent = "Last updated: " + formatted;
+      const pad = (n)=> String(n).padStart(2,'0');
+      const s = `${ts.getFullYear()}-${pad(ts.getMonth()+1)}-${pad(ts.getDate())} `
+              + `${pad(ts.getHours())}:${pad(ts.getMinutes())}:${pad(ts.getSeconds())}`;
+      document.getElementById('timestamp').textContent = `Last updated: ${s}`;
+    })();
+
+    // ---------- helpers ----------
+    const q = (id)=>document.getElementById(id);
+    const fmtPct = v => `${(v*100).toFixed(1)}%`;
+
+    // Fast, stable inverse normal CDF (Abramowitz–Stegun)
+    function invNorm(p){
+      const a1=-39.6968302866538,a2=220.946098424521,a3=-275.928510446969,a4=138.357751867269,a5=-30.6647980661472,a6=2.50662827745924;
+      const b1=-54.4760987982241,b2=161.585836858041,b3=-155.698979859887,b4=66.8013118877197,b5=-13.2806815528857;
+      const c1=-0.00778489400243029,c2=-0.322396458041136,c3=-2.40075827716184,c4=-2.54973253934373,c5=4.37466414146497,c6=2.93816398269878;
+      const d1=0.00778469570904146,d2=0.32246712907004,d3=2.445134137143,d4=3.75440866190742;
+      if(p<=0||p>=1) return NaN; let qv,rv;
+      if(p<0.02425){ qv=Math.sqrt(-2*Math.log(p)); return -(((((c1*qv+c2)*qv+c3)*qv+c4)*qv+c5)*qv+c6)/((((d1*qv+d2)*qv+d3)*qv+d4)*qv+1); }
+      if(p>1-0.02425){ qv=Math.sqrt(-2*Math.log(1-p)); return (((((c1*qv+c2)*qv+c3)*qv+c4)*qv+c5)*qv+c6)/((((d1*qv+d2)*qv+d3)*qv+d4)*qv+1); }
+      qv=p-0.5; rv=qv*qv;
+      return (((((a1*rv+a2)*rv+a3)*rv+a4)*rv+a5)*rv+a6)*qv/(((((b1*rv+b2)*rv+b3)*rv+b4)*rv+b5)*rv+1);
+    }
+
+    function computeN(p1,p2,alpha,power){
+      const delta = Math.abs(p2-p1);
+      if (delta <= 0) return Infinity;
+      const zAlpha = invNorm(1 - alpha/2);  // two-sided by default; switch to (1-alpha) if one-sided
+      const zPower = invNorm(power);
+      const pbar = (p1+p2)/2;
+      // classic approx using pooled term; feel free to swap to unpooled if desired
+      const n = (2 * (zAlpha + zPower) ** 2 * pbar * (1 - pbar)) / (delta ** 2);
+      return n;
+    }
+
+    // keep sliders and numbers mirrored without inline handlers
+    const pairs = [
+      ['p1','p1_num'], ['p2','p2_num'],
+      ['alpha','alpha_num'], ['power','power_num']
+    ];
+    function syncPair(active, other){
+      q(other).value = q(active).value;
+    }
+
+    function readState(){
+      const p1 = parseFloat(q('p1').value);
+      const p2 = parseFloat(q('p2').value);
+      const alpha = parseFloat(q('alpha').value);
+      const power = parseFloat(q('power').value);
+      return {p1,p2,alpha,power};
+    }
+
+    function render(){
+      const {p1,p2,alpha,power} = readState();
+      // update small displays
+      q('p1_out').textContent = fmtPct(p1);
+      q('p2_out').textContent = fmtPct(p2);
+      q('alpha_out').textContent = alpha.toFixed(3).replace(/0+$/,'').replace(/\.$/,'');
+      q('power_out').textContent = power.toFixed(3).replace(/0+$/,'').replace(/\.$/,'');
+      q('delta_out').textContent = fmtPct(Math.abs(p2-p1));
+
+      // compute N
+      const n = computeN(p1,p2,alpha,power);
+      q('n_out').textContent = Number.isFinite(n) ? `≈ ${Math.round(n).toLocaleString()}` : '—';
+
+      // plot
+      const data = [{
+        x: [p1,p2], y: [0,1], mode:'lines+markers', name:'rates'
+      }];
+      const layout = {
+        title: `P₁=${fmtPct(p1)}  P₂=${fmtPct(p2)}  |  N/group ${Number.isFinite(n)?'≈ '+Math.round(n).toLocaleString():'—'}`,
+        xaxis:{title:'Conversion rate', range:[0, 0.45]},
+        yaxis:{visible:false},
+        margin:{t:60,l:40,r:20,b:50},
+        showlegend:false
+      };
+      // first call uses newPlot, subsequent calls use react
+      if (!render._plotted){
+        Plotly.newPlot('plot', data, layout, {displayModeBar:false});
+        render._plotted = true;
+      } else {
+        Plotly.react('plot', data, layout, {displayModeBar:false});
+      }
+    }
+
+    // attach listeners
+    pairs.forEach(([sl,nb])=>{
+      q(sl).addEventListener('input', ()=>{ syncPair(sl, nb); render(); });
+      q(nb).addEventListener('input', ()=>{ syncPair(nb, sl); render(); });
     });
+
+    // initial draw
+    render();
   </script>
 </body>
 </html>
