@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>StudyFlow: A/B Test Sample Size & Power Tool</title>
+
+  <!-- Link to external CSS file -->
+  <link rel="stylesheet" href="styles.css" />
+
+  <!-- Plotly Library for visualization -->
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+
+  <!-- MathJax for LaTeX rendering (Statistical Equations) -->
+  <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+  <script id="MathJax-script" async
+    src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+</head>
+<body>
+  <!-- Fun and Engaging Title -->
+  <h1>StudyFlow Influencer A/B Test Planner</h1>
+
+  <!-- Context Section -->
+  <div class="intro">
+    <p>
+      <strong>Context:</strong> As a Data Analyst for StudyFlow (a student study-habit SaaS), your job is to compare the conversion rates of two marketing channels: your current partner, **Influencer Alpha** (Control Group $P_1$), versus the new, more expensive **Influencer Beta** (Variant $P_2$).
+    </p>
+    <p>
+      This tool helps you determine the **Required Sample Size** ($N$ per group) needed for a valid A/B test by adjusting the statistical parameters below.
+    </p>
+    <p class="equation">
+      <strong>Core Test:</strong> You are testing if the conversion rate of the Variant ($P_2$) is greater than the Control ($P_1$) using a Z-test for two independent proportions.
+    </p>
+    <p class="equation">
+      **Required Sample Size (N) Formula:** $$N = \frac{\left[z_{1-\alpha} \sqrt{2P_{pool}(1-P_{pool})} + z_{1-\beta} \sqrt{P_1(1-P_1) + P_2(1-P_2)}\right]^2}{\delta^2}$$
+    </p>
+    <p class="equation">
+      *Where: $\delta = |P_2 - P_1|$ (Hypothesized Difference)*
+    </p>
+  </div>
+
+  <!-- Output & Metrics Display -->
+  <div id="metrics" class="metrics-panel">
+      <h2>A/B Test Outcomes</h2>
+      <p id="sample_size" class="metric-output"></p>
+      <p id="p2_rate" class="metric-output"></p>
+  </div>
+
+  <hr class="separator" />
+
+  <!-- Control Groups -->
+  <h3>Test Parameters (What You Decide)</h3>
+  <div class="controls-container">
+    <div class="control-column">
+        <h4>Conversion Rate Assumptions</h4>
+        <!-- Baseline Proportion (P1) -->
+        <div class="control-group">
+          <label>
+            P₁ (Alpha's Current Conversion Rate):
+            <input type="range" id="P1" min="0.05" max="0.30" step="0.01" value="0.10" oninput="syncValue('P1','slider')" />
+            <input type="number" id="P1_num" min="0.05" max="0.30" step="0.001" value="0.10" oninput="syncValue('P1','number')" />
+            <span id="P1_value" class="display-value">0.10</span>
+            <p class="plain-language">Alpha's current success rate (Control Group).</p>
+          </label>
+        </div>
+
+        <!-- Hypothesized Difference (delta) -->
+        <div class="control-group">
+          <label>
+            $\delta$ (Minimum Required Lift from Beta):
+            <input type="range" id="delta" min="0.01" max="0.10" step="0.005" value="0.03" oninput="syncValue('delta','slider')" />
+            <input type="number" id="delta_num" min="0.01" max="0.10" step="0.001" value="0.03" oninput="syncValue('delta','number')" />
+            <span id="delta_value" class="display-value">0.03</span>
+            <p class="plain-language">The smallest conversion rate increase Beta must deliver to be worth the cost.</p>
+          </label>
+        </div>
+    </div>
+
+    <div class="control-column">
+        <h4>Confidence & Risk Settings</h4>
+        <!-- Type I Error (Alpha) -->
+        <div class="control-group">
+          <label>
+            $\alpha$ (Risk of False Positive):
+            <input type="range" id="alpha" min="0.01" max="0.20" step="0.01" value="0.05" oninput="syncValue('alpha','slider')" />
+            <input type="number" id="alpha_num" min="0.01" max="0.20" step="0.001" value="0.05" oninput="syncValue('alpha','number')" />
+            <span id="alpha_value" class="display-value">0.05</span>
+            <p class="plain-language">Risk of **incorrectly signing Beta** when they are not better (The Null is true).</p>
+          </label>
+        </div>
+
+        <!-- Power (1-Beta) -->
+        <div class="control-group">
+          <label>
+            Power (Chance of True Positive):
+            <input type="range" id="power" min="0.70" max="0.99" step="0.01" value="0.80" oninput="syncValue('power','slider')" />
+            <input type="number" id="power_num" min="0.70" max="0.99" step="0.001" value="0.80" oninput="syncValue('power','number')" />
+            <span id="power_value" class="display-value">0.80</span>
+            <p class="plain-language">Chance of **correctly detecting Beta's lift** when they are truly better (The Alternative is true).</p>
+          </label>
+        </div>
+    </div>
+  </div>
+
+
+  <hr class="separator" />
+
+  <!-- Plotly Visualization Div -->
+  <div id="distributionPlot"></div>
+
+  <!-- Exploratory Questions -->
+  <div id="questions">
+    <h3>Exploratory Questions for StudyFlow Analysts</h3>
+    <ol>
+      <li>What happens to the **Required Sample Size** ($N$) when you decrease your $\alpha$ (False Positive risk)? Why does this change occur?</li>
+      <li>Why does a larger **Minimum Required Lift ($\delta$)** drastically *decrease* the required sample size? Relate this to the visual overlap of the two distributions.</li>
+      <li>If Influencer Beta charges a premium, should you lean toward higher Power (e.g., 0.95) or lower $\alpha$ (e.g., 0.01)? Which error has the higher business cost?</li>
+      <li>Observe the visual separation of the two distributions. What elements in the formula mathematically control this separation?</li>
+    </ol>
+  </div>
+
+  <!-- External JavaScript -->
+  <script src="app.js" defer></script>
+</body>
+</html>
