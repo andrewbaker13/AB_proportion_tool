@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>StudyFlow: A/B Test Sample Size & Power Tool</title>
+  <title>StudyFlow: A/B Testing Comparison Tool</title>
 
   <!-- Preserve original external CSS -->
   <link rel="stylesheet" href="style.css" />
@@ -50,29 +50,29 @@
 </head>
 <body>
   <header>
-    <!-- Preserve your original H1 text -->
-    <h1>StudyFlow Influencer A/B Test Planner</h1>
+  <h1>StudyFlow A/B Testing Comparison Tool</h1>
     <div id="timestamp"></div>
   </header>
 
   <!-- ======== PRESERVED ORIGINAL INTRO SECTION (unchanged) ======== -->
   <div class="intro">
     <p>
-      <strong>Context:</strong> As a Data Analyst for StudyFlow (a student study-habit SaaS), your job is to compare the conversion rates of two marketing channels: your current partner, **Influencer Alpha** (Control Group $P_1$), versus the new, more expensive **Influencer Beta** (Variant $P_2$).
+      <strong>Context:</strong> As a Data Analyst for StudyFlow (a student study-habit SaaS), your task is to compare the observed conversion rates for two marketing channels: the current partner <strong>Influencer Alpha</strong> (Control, <code>P1</code>) and the new partner <strong>Influencer Beta</strong> (Variant, <code>P2</code>).
     </p>
     <p>
-      This tool helps you determine the <strong>Required Sample Size</strong> ($N$ per group) needed for a valid A/B test by adjusting the statistical parameters below.
+      This interactive tool helps you analyze A/B test results using the observed sample sizes and conversion rates. It computes confidence intervals, visualizes uncertainty with fan bands, and performs a two-proportion z-test to assess whether the difference is statistically meaningful.
     </p>
     <p class="equation">
-      <strong>Core Test:</strong> You are testing if the conversion rate of the Variant ($P_2$) is greater than the Control ($P_1$) using a Z-test for two independent proportions.
+      <strong>Core Test (two-proportion z-test with hypothesized difference Δ₀):</strong>
+      $$z = \frac{P_2 - P_1 - \Delta_0}{\sqrt{\dfrac{P_1(1-P_1)}{n_1} + \dfrac{P_2(1-P_2)}{n_2}}} \quad\text{(Wald / unpooled)}$$
+      <br />
+      <em>Null hypothesis: \(H_0:\ \Delta = \Delta_0\). By default \(\Delta_0 = 0\) (no difference).</em>
     </p>
     <p class="equation">
-      <strong>Required Sample Size (N) Formula:</strong>
-      $$N = \frac{\left[z_{1-\alpha} \sqrt{2P_{pool}(1-P_{pool})} + z_{1-\beta} \sqrt{P_1(1-P_1) + P_2(1-P_2)}\right]^2}{\delta^2}$$
+      <strong>Confidence Interval for the difference (Δ = P2 − P1):</strong>
+      $$\Delta \pm z_{1-\alpha/2}\sqrt{\frac{P_1(1-P_1)}{n_1}+\frac{P_2(1-P_2)}{n_2}}$$
     </p>
-    <p class="equation">
-      <em>Where: $\delta = |P_2 - P_1|$ (Hypothesized Difference)</em>
-    </p>
+    
   </div>
 
   <!-- ======== PRESERVED ORIGINAL METRICS PANEL (unchanged) ======== -->
@@ -145,6 +145,15 @@
           <label for="ci99">99%</label>
         </div>
       </div>
+      
+      <div style="margin-top:12px;">
+        <label>Hypothesized difference Δ₀ (proportion points, default = 0)</label>
+        <div class="row">
+          <input id="delta" type="range" min="-0.20" max="0.20" step="0.001" value="0.00">
+          <input id="deltanum" type="number" min="-0.20" max="0.20" step="0.001" value="0.00">
+        </div>
+        <p class="hint">Set the null hypothesis difference Δ₀ (e.g., 0.05 = 5 percentage points). Default is 0 (no difference).</p>
+      </div>
 
       <div id="writeups">
         <h4>APA-Style Statistical Reporting</h4>
@@ -157,23 +166,16 @@
 
   <hr class="separator" />
 
-  <!-- ======== PRESERVED ORIGINAL QUESTIONS (unchanged) ======== -->
-  <div id="questions">
-    <h3>Exploratory Questions for StudyFlow Analysts</h3>
-    <ol>
-      <li>What happens to the <strong>Required Sample Size</strong> ($N$) when you decrease your $\alpha$ (False Positive risk)? Why does this change occur?</li>
-      <li>Why does a larger <strong>Minimum Required Lift ($\delta$)</strong> drastically <em>decrease</em> the required sample size? Relate this to the visual overlap of the two distributions.</li>
-      <li>If Influencer Beta charges a premium, should you lean toward higher Power (e.g., 0.95) or lower $\alpha$ (e.g., 0.01)? Which error has the higher business cost?</li>
-      <li>Observe the visual separation of the two distributions. What elements in the formula mathematically control this separation?</li>
-    </ol>
-  </div>
+  <!-- Removed old exploratory questions per request -->
 
   <!-- ======== NEW: Charts & Titles ======== -->
   <h3 id="propTitle">Proportions with Fan Chart</h3>
   <div id="propChart" role="img" aria-label="Proportions fan chart showing estimated proportions for Control and Variant"></div>
+  <div id="propInterpret" class="hint" aria-live="polite" style="margin-top:8px;"></div>
 
   <h3 id="diffTitle">Difference (Δ) with Fan Chart</h3>
   <div id="diffChart" role="img" aria-label="Difference fan chart showing the distribution of Δ (Variant − Control) in percentage points"></div>
+  <div id="diffInterpret" class="hint" aria-live="polite" style="margin-top:8px;"></div>
 
   <!-- NEW: Chart Axis Settings (below charts) -->
   <div class="card" id="boxC">
@@ -217,6 +219,21 @@
     </table>
   </div>
 
+  <!-- NEW: Critical Thinking Questions -->
+  <div class="card" id="criticalThinking" style="margin-top:20px;">
+    <h3>Critical Thinking Questions</h3>
+    <ol>
+      <li>How would you separate statistical significance from practical significance for this test? Give an example where a small but significant lift is not worth the cost.</li>
+      <li>Which assumptions underlie the z-test and the Wald confidence intervals used here? How might violations (rare events, small n) affect conclusions?</li>
+      <li>If the 95% CI barely excludes Δ₀ but the sample sizes are small, what additional checks or data would you request before making a business decision?</li>
+      <li>How would you incorporate cost, revenue, or customer lifetime value into a decision rule that uses the observed Δ and its CI?</li>
+      <li>Design a short experiment modification (blocking, stratification, or longer run) that could reduce uncertainty for this comparison.</li>
+    </ol>
+  </div>
+
+  <!-- Bottom last-modified timestamp -->
+  <div style="margin-top:12px; color:#6b7280; font-size:0.9rem;" id="lastModified"></div>
+
   <!-- ======== SCRIPT: everything needed for the added features lives here; your app.js still loads if present ======== -->
   <script>
     // timestamp (preserved utility)
@@ -224,7 +241,10 @@
       const ts = new Date();
       const pad = n => String(n).padStart(2,'0');
       const s = `${ts.getFullYear()}-${pad(ts.getMonth()+1)}-${pad(ts.getDate())} ${pad(ts.getHours())}:${pad(ts.getMinutes())}:${pad(ts.getSeconds())}`;
-      document.getElementById('timestamp').textContent = `Last updated: ${s}`;
+      const topEl = document.getElementById('timestamp');
+      if(topEl) topEl.textContent = `Last updated: ${s}`;
+      const botEl = document.getElementById('lastModified');
+      if(botEl) botEl.textContent = `Last modified: ${s}`;
     })();
 
     // helpers
@@ -264,15 +284,16 @@
       return { d, lo: d - z*se, hi: d + z*se, se };
     }
 
-    // test
-    function zTestTwoProp(p1,n1,p2,n2){
-      const x1=p1*n1, x2=p2*n2;
-      const pPool=(x1+x2)/(n1+n2);
-      const se=Math.sqrt(pPool*(1-pPool)*(1/n1+1/n2));
-      if(se===0) return { z:NaN, p:NaN, pPool, se };
-      const z=(p2-p1)/se;
-      const pval=2*(1 - normCdf(Math.abs(z)));
-      return { z, p:pval, pPool, se };
+    // test (allow hypothesized difference delta0; use unpooled/Wald SE)
+    function zTestTwoProp(p1,n1,p2,n2, delta0 = 0){
+      const x1 = p1 * n1, x2 = p2 * n2;
+      const pPool = (x1 + x2) / (n1 + n2);
+      // use unpooled (Wald) standard error for testing against non-zero delta
+      const se = Math.sqrt(Math.max(0, p1*(1-p1)/n1 + p2*(1-p2)/n2));
+      if(se === 0) return { z: NaN, p: NaN, pPool, se };
+      const z = (p2 - p1 - delta0) / se;
+      const pval = 2 * (1 - normCdf(Math.abs(z)));
+      return { z, p: pval, pPool, se };
     }
 
     // names
@@ -311,6 +332,8 @@
 
     // write-ups
     function buildWriteups({g1,g2}, p1, n1, p2, n2, alpha, z, p, cd, levelPct){
+      // look up current hypothesized delta from control (UI may set this)
+      const delta0 = Number.isFinite(parseFloat(q("delta")?.value)) ? parseFloat(q("delta").value) : 0;
       const p1s = pct(p1,1), p2s = pct(p2,1);
       const dsPP  = ppLabel(cd.d,1);
       const loPP  = ppLabel(cd.lo,1);
@@ -324,7 +347,7 @@
         `${g1} (p = ${p1s}, n = ${n1}) at the ${levelPct}% confidence level (α = ${alpha.toFixed(2)}). ` +
         `The difference in proportions was Δ = ${dsPP}, ${levelPct}% CI [${loPP}, ${hiPP}], ` +
         `z = ${fmt(z,3)}, p = ${Number.isFinite(p) ? (p < 0.001 ? "< .001" : fmt(p,3)) : "—"}. ` +
-        `Null hypothesis: H₀: p_${g2} = p_${g1}. ${decisionClause}`;
+        `Null hypothesis: H₀: Δ = ${ppLabel(delta0,1)}. ${decisionClause}`;
 
       const decision = significant ? "statistically reliable" : "not statistically reliable";
       const mgr =
@@ -389,9 +412,10 @@
       const names = getNames();
       const { g1, g2 } = names;
 
-      const p1 = parseFloat(q('p1').value),   p2 = parseFloat(q('p2').value);
-      const n1 = parseInt(q('n1').value,10),  n2 = parseInt(q('n2').value,10);
-      const alpha = currentAlpha();
+  const p1 = parseFloat(q('p1').value),   p2 = parseFloat(q('p2').value);
+  const n1 = parseInt(q('n1').value,10),  n2 = parseInt(q('n2').value,10);
+  const alpha = currentAlpha();
+  const delta0 = Number.isFinite(parseFloat(q("delta")?.value)) ? parseFloat(q("delta").value) : 0;
       if ([p1,p2,n1,n2,alpha].some(v=>isNaN(v))) return;
 
       // z for 50/80/selected
@@ -476,7 +500,8 @@
         makeBandRect(cd_50.lo, cd_50.hi, yD, diffHalf*0.7, "#6f8cff", 0.45),
         makeBandRect(cd_80.lo, cd_80.hi, yD, diffHalf*0.9, "#9bb1ff", 0.35),
         makeBandRect(cd.lo,    cd.hi,    yD, diffHalf,     "#d8e2ff", 0.25),
-        { type:"line", xref:"x", yref:"paper", x0:0, x1:0, y0:0, y1:1, line:{ width:1, dash:"dot", color:"#777" } }
+        // vertical reference line at hypothesized difference Δ0 (x = Δ0)
+        { type: "line", xref: "x", yref: "paper", x0: delta0, x1: delta0, y0: 0, y1: 1, line: { width: 1, dash: "dot", color: "#777" } }
       ];
 
       const diffTrace = {
@@ -507,11 +532,40 @@
       q("diffTitle").textContent = `Difference in Proportions (${g2} − ${g1}) — Fan Chart (50/80/${levelPct}%)`;
 
       // write-ups + table
-      const { z, p } = zTestTwoProp(p1, n1, p2, n2);
+      const { z, p } = zTestTwoProp(p1, n1, p2, n2, delta0);
       const { apa, mgr } = buildWriteups({g1,g2}, p1, n1, p2, n2, alpha, z, p, cd, levelPct);
       q("apaWriteup").textContent = apa;
       q("mgrWriteup").textContent = mgr;
       renderTable({g1,g2}, p1, n1, c1, p2, n2, c2, cd, levelPct);
+
+      // -------------------- Interpretation text for Proportions chart --------------------
+      try{
+        const p1s = pct(p1,1), p2s = pct(p2,1);
+        const c1lo = pct(c1.lo,1), c1hi = pct(c1.hi,1);
+        const c2lo = pct(c2.lo,1), c2hi = pct(c2.hi,1);
+        const se1 = (c1.se).toFixed(4), se2 = (c2.se).toFixed(4);
+        const propMsg = `<strong>${g1}:</strong> estimate = ${p1s} (n=${n1.toLocaleString()}), ${levelPct}% CI [${c1lo}, ${c1hi}], SE=${se1}. `+
+                        `<strong>${g2}:</strong> estimate = ${p2s} (n=${n2.toLocaleString()}), ${levelPct}% CI [${c2lo}, ${c2hi}], SE=${se2}. `+
+                        `Fan bands show the 50% (inner), 80% (middle), and ${levelPct}% (outer) intervals — wider bands indicate more uncertainty. `+
+                        `If the bands/intervals for the two groups overlap substantially, the evidence for a true difference is weak.`;
+        q('propInterpret').innerHTML = propMsg;
+      }catch(e){ q('propInterpret').textContent = ''; }
+
+      // -------------------- Interpretation text for Difference chart --------------------
+      try{
+        const dObs = ppLabel(cd.d,1);
+        const dlo = ppLabel(cd.lo,1), dhi = ppLabel(cd.hi,1);
+        const pvalText = Number.isFinite(p) ? (p < 0.001 ? '< .001' : fmt(p,3)) : '—';
+        const zText = Number.isFinite(z) ? fmt(z,3) : '—';
+        const includesDelta0 = (cd.lo <= delta0 && cd.hi >= delta0);
+        const includeText = includesDelta0 ? 'includes' : 'does not include';
+        const sig = Number.isFinite(p) && p < alpha;
+        const decision = sig ? 'statistically significant at the selected α' : 'not statistically significant at the selected α';
+        const diffMsg = `Observed difference Δ = ${dObs} with ${levelPct}% CI [${dlo}, ${dhi}]. `+
+                        `Test vs H₀: Δ = ${ppLabel(delta0,1)} → z = ${zText}, p = ${pvalText} (${decision}). `+
+                        `The ${levelPct}% CI ${includeText} the hypothesized Δ₀, so the visual estimate ${includeText} that value.`;
+        q('diffInterpret').innerHTML = diffMsg;
+      }catch(e){ q('diffInterpret').textContent = ''; }
 
       // (Optional) also update preserved metrics panel if you use it
       if (q("sample_size")) q("sample_size").textContent = "";
@@ -527,6 +581,8 @@
     link(q("p2"), q("p2num"));
     link(q("n1"), q("n1num"));
     link(q("n2"), q("n2num"));
+    // link hypothesized difference control
+    if (q("delta") && q("deltanum")) link(q("delta"), q("deltanum"));
     [q("g1name"), q("g2name")].forEach(el => el.addEventListener("input", render));
     document.getElementById("ciLevelGroup").addEventListener("change", render);
     [q("lockPropAxis"), q("propMin"), q("propMax"),

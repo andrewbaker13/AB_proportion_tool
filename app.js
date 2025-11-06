@@ -1,5 +1,9 @@
 // ---- helpers to read current UI values ----
-function getVal(id){ return parseFloat(document.getElementById(id).value); }
+function getVal(id){
+  const el = document.getElementById(id);
+  if(!el) return NaN;
+  return parseFloat(el.value);
+}
 
 function currentParams(){
   return {
@@ -10,6 +14,16 @@ function currentParams(){
     n1: Math.max(1, Math.floor(getVal("n1Number") || 0)),
     n2: Math.max(1, Math.floor(getVal("n2Number") || 0))
   };
+}
+
+// helper to locate delta value from possible element ids (backwards compatible)
+function currentDelta(){
+  const tryIds = ["deltaSlider", "delta", "deltanum", "deltaNumber"];
+  for(const id of tryIds){
+    const v = getVal(id);
+    if(!isNaN(v)) return v;
+  }
+  return 0;
 }
 
 // Inverse normal (Abramowitz–Stegun)
@@ -24,6 +38,16 @@ function inverseNormal(p){
   q=p-0.5; r=q*q;
   return (((((a1*r+a2)*r+a3)*r+a4)*r+a5)*r+a6)*q/(((((b1*r+b2)*r+b3)*r+b4)*r+b5)*r+1);
 }
+
+// Approximate error function and normal CDF for p-value calculation
+function erf(x){
+  const sign = Math.sign(x) || 1;
+  const a1=0.254829592,a2=-0.284496736,a3=1.421413741,a4=-1.453152027,a5=1.061405429,p=0.3275911;
+  const t = 1/(1 + p*Math.abs(x));
+  const y = 1 - (((((a5*t+a4)*t+a3)*t+a2)*t+a1)*t)*Math.exp(-x*x);
+  return sign * y;
+}
+function normCdf(x){ return 0.5 * (1 + erf(x / Math.SQRT2)); }
 
 // ---- CI calculators (Wald; simple & transparent for class) ----
 // Single-proportion 95% CI using normal approx: p ± z * sqrt(p(1-p)/n)
@@ -44,6 +68,7 @@ function pct(x){ return (x*100).toFixed(1) + "%"; }
 // ---- rendering ----
 function renderCharts(){
   const {p1, p2, alpha, n1, n2} = currentParams();
+  const delta = currentDelta();
   if ([p1,p2,alpha,n1,n2].some(x => isNaN(x))) return;
 
   const z = inverseNormal(1 - alpha/2); // two-sided 95% when alpha=0.05
@@ -91,14 +116,20 @@ function renderCharts(){
     name: "Difference"
   }];
 
-  const maxAbs = Math.max(Math.abs(cd.hi), Math.abs(cd.lo), Math.abs(cd.d));
+  const maxAbs = Math.max(Math.abs(cd.hi), Math.abs(cd.lo), Math.abs(cd.d), Math.abs(delta));
   const pad = Math.max(0.01, maxAbs * 0.25);
 
+  // z-test against hypothesized delta (unpooled/Wald)
+  const se_unpooled = Math.sqrt(Math.max(0, p1*(1-p1)/n1 + p2*(1-p2)/n2));
+  const ztest = se_unpooled === 0 ? NaN : (p2 - p1 - delta) / se_unpooled;
+  const pval = Number.isFinite(ztest) ? 2 * (1 - normCdf(Math.abs(ztest))) : NaN;
+
   const diffLayout = {
-    title: `Difference with 95% CI`,
+    title: `Difference with 95% CI (H₀: Δ = ${ (delta*100).toFixed(2) } pct.pts)`,
     yaxis: { title: "Δ (proportion points)", range: [-(maxAbs+pad), (maxAbs+pad)] },
     shapes: [{
-      type: "line", x0: -0.5, x1: 1.5, y0: 0, y1: 0, line: { width: 1, dash: "dot" }
+      // horizontal reference at hypothesized delta
+      type: "line", x0: -0.5, x1: 1.5, y0: delta, y1: delta, line: { width: 1, dash: "dot" }
     }],
     margin: { t: 60, l: 60, r: 20, b: 60 },
     showlegend: false
@@ -111,7 +142,9 @@ function renderCharts(){
 function attachCiListeners(){
   const ids = [
     "p1Slider","p1Number","p2Slider","p2Number",
-    "alphaSlider","alphaNumber","n1Number","n2Number"
+    "alphaSlider","alphaNumber","n1Number","n2Number",
+    // include delta controls if present
+    "deltaSlider","deltaNumber","delta","deltanum"
   ];
   ids.forEach(id => {
     const el = document.getElementById(id);
