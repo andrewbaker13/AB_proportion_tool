@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -100,8 +101,8 @@
       </div>
       <label><span id="g1label_p">Control</span> proportion \(p_1\)</label>
       <div class="row">
-        <input id="p1" type="range" min="0.01" max="0.5" step="0.005" value="0.10">
-        <input id="p1num" type="number" min="0.001" step="0.001" value="0.10">
+        <input id="p1" type="range" min="0" max="1" step="0.01" value="0.10">
+        <input id="p1num" type="number" min="0" max="1" step="0.01" value="0.10">
       </div>
       <label>Sample size \(n_1\) for <span id="g1label_n">Control</span></label>
       <div class="row">
@@ -118,8 +119,8 @@
       </div>
       <label><span id="g2label_p">Variant</span> proportion \(p_2\)</label>
       <div class="row">
-        <input id="p2" type="range" min="0.01" max="0.5" step="0.005" value="0.13">
-        <input id="p2num" type="number" min="0.001" step="0.001" value="0.13">
+        <input id="p2" type="range" min="0" max="1" step="0.01" value="0.13">
+        <input id="p2num" type="number" min="0" max="1" step="0.01" value="0.13">
       </div>
       <label>Sample size \(n_2\) for <span id="g2label_n">Variant</span></label>
       <div class="row">
@@ -149,8 +150,8 @@
       <div style="margin-top:12px;">
         <label>Hypothesized difference Δ₀ (proportion points, default = 0)</label>
         <div class="row">
-          <input id="delta" type="range" min="-0.20" max="0.20" step="0.001" value="0.00">
-          <input id="deltanum" type="number" min="-0.20" max="0.20" step="0.001" value="0.00">
+          <input id="delta" type="range" min="-1" max="1" step="0.01" value="0.00">
+          <input id="deltanum" type="number" min="-1" max="1" step="0.01" value="0.00">
         </div>
         <p class="hint">Set the null hypothesis difference Δ₀ (e.g., 0.05 = 5 percentage points). Default is 0 (no difference).</p>
       </div>
@@ -425,7 +426,7 @@
       const levelPct = Math.round((1 - alpha) * 100);
 
       // CIs
-      const c1_50 = ciProp(p1, n1, z50), c1_80 = ciProp(p1, n1, z80), c1 = ciProp(p1, n1, zSel);
+      const c1_50 = ciProp(p1, n1, z50), c1_80 = ciProp(1, n1, z80), c1 = ciProp(p1, n1, zSel);
       const c2_50 = ciProp(p2, n2, z50), c2_80 = ciProp(p2, n2, z80), c2 = ciProp(p2, n2, zSel);
       const cd_50 = ciDiff(p1, n1, p2, n2, z50), cd_80 = ciDiff(p1, n1, p2, n2, z80), cd = ciDiff(p1, n1, p2, n2, zSel);
 

@@ -93,7 +93,7 @@ function renderCharts(){
 
   const propLayout = {
     title: `Proportions with 95% CI (n₁=${n1.toLocaleString()}, n₂=${n2.toLocaleString()}, α=${alpha.toFixed(2)})`,
-    yaxis: { title: "Proportion", range: [0, Math.min(1, Math.max(c1.hi, c2.hi) * 1.15)] },
+    yaxis: { title: "Proportion", range: [0, Math.max(c1.hi, c2.hi) * 1.15] },
     margin: { t: 60, l: 60, r: 20, b: 60 },
     showlegend: false
   };
